@@ -2,26 +2,16 @@
 
 namespace DotNetPathUtils;
 
-/// <summary>
-/// Provides methods to ensure directories are present in the system's PATH environment variable.
-/// </summary>
 public class PathEnvironmentHelper
 {
     private readonly IEnvironmentService _service;
     private const string PathVariableName = "PATH";
 
-    /// <summary>
-    /// Initializes a new instance of the PathEnvironmentHelper.
-    /// </summary>
-    /// <param name="service">The environment service to use for all OS interactions.</param>
     public PathEnvironmentHelper(IEnvironmentService service)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
     }
 
-    /// <summary>
-    /// Ensures the application's own XDG configuration directory is included in the PATH.
-    /// </summary>
     public PathUpdateResult EnsureApplicationXdgConfigDirectoryIsInPath(EnvironmentVariableTarget target = EnvironmentVariableTarget.User)
     {
         string? appName = _service.GetApplicationName();
@@ -36,9 +26,6 @@ public class PathEnvironmentHelper
         return EnsureDirectoryIsInPath(appConfigPath, target);
     }
 
-    /// <summary>
-    /// Ensures that a specified directory is included in the PATH environment variable.
-    /// </summary>
     public PathUpdateResult EnsureDirectoryIsInPath(string directoryPath, EnvironmentVariableTarget target = EnvironmentVariableTarget.User)
     {
         if (string.IsNullOrWhiteSpace(directoryPath))

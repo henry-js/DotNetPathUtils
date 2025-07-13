@@ -4,9 +4,6 @@ using Xdg.Directories;
 
 namespace DotNetPathUtils;
 
-/// <summary>
-/// The production implementation of IEnvironmentService that interacts directly with the operating system.
-/// </summary>
 public class SystemEnvironmentService : IEnvironmentService
 {
     public string? GetEnvironmentVariable(string variable, EnvironmentVariableTarget target) =>
