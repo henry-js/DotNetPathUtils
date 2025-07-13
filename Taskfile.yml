@@ -5,8 +5,14 @@ includes:
   dotnet:
     taskfile: ./.build/dotnet.yml
     vars:
-      SOLUTION_FILE: "taskfile var PLACEHOLDER"
+      SOLUTION_FILE: "DotNetPathUtils.slnx"
 tasks:
   default:
     cmds:
+      - task: build
+  build:
+    cmds:
       - task: dotnet:build
+  test:
+    cmds:
+      - task: dotnet:test
