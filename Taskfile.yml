@@ -33,10 +33,12 @@ tasks:
     desc: "Cleans the solution"
     cmds:
       - task: dotnet:clean
+
   build:
     desc: "Builds the solution"
     cmds:
       - task: dotnet:build
+
   test:
     desc: "Runs all tests"
     cmds:
@@ -70,9 +72,28 @@ tasks:
         msg: "Not a library project. Set PROJECT_TO_PACK in .env to enable."
     cmds:
       - task: dotnet:pack-nuget
+
+  setup:
+    desc: "Restores local .NET tools defined in the manifest"
+    cmds:
+      - dotnet tool restore
+    preconditions:
+      - sh: "[ -f .config/dotnet-tools.json ]"
+        msg: "Tool manifest '.config/dotnet-tools.json' not found."
+
+  get-version:
+    # This internal task gets the version from MinVer and makes it available
+    # to other tasks as {{.GET_VERSION}}.
+    cmds:
+      - dotnet minver --tag-prefix v
+    deps: [setup]
+
   pack:velopack:
     desc: "Packages the executable application using Velopack"
     deps: [publish-app]
+    vars:
+      APP_VERSION:
+        sh: task get-version
     preconditions:
       # Precondition remains the same, checking for PROJECT_TO_PUBLISH.
       - sh: |
