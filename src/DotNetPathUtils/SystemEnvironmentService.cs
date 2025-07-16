@@ -49,6 +49,7 @@ public class SystemEnvironmentService : IEnvironmentService
     private const int HWND_BROADCAST = 0xFFFF;
     private const uint WM_SETTINGCHANGE = 0x001A;
     private const uint SMTO_ABORTIFHUNG = 0x0002;
+
     private const uint SMTO_NOTIMEOUTIFNOTHUNG = 0x0008;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]

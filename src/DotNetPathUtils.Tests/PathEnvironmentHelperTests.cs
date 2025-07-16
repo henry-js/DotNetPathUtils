@@ -1,4 +1,5 @@
 ﻿using System.Security;
+using System.Threading.Tasks;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using TUnit.Assertions.AssertConditions.Throws;
@@ -193,5 +194,66 @@ public class PathEnvironmentHelperTests
         // Verify the message and that the original exception is wrapped
         await Assert.That(ex!.Message).IsEqualTo("Failed to set Machine PATH variable. Administrator privileges may be required.");
         await Assert.That(ex.InnerException).IsEquivalentTo(originalException);
+    }
+
+    // In PathEnvironmentHelperTests.cs
+
+    [Test]
+    public async Task RemoveApplicationXdgConfigDirectoryFromPath_When_Path_Exists_Removes_It()
+    {
+        // Arrange
+        var appName = "MyCoolApp";
+        var xdgHome = "/home/user/.config";
+        var pathToRemove = Path.Combine(xdgHome, appName);
+        var existingPath = $"/usr/bin{Path.PathSeparator}{pathToRemove}{Path.PathSeparator}/usr/local/bin";
+        var expectedNewPath = $"/usr/bin{Path.PathSeparator}/usr/local/bin";
+
+        _service.GetApplicationName().Returns(appName);
+        _service.GetXdgConfigHome().Returns(xdgHome);
+        _service.GetFullPath(pathToRemove).Returns(pathToRemove); // Keep it simple for the test
+        _service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User).Returns(existingPath);
+
+        // Act
+        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath(EnvironmentVariableTarget.User);
+
+        // Assert
+        await Assert.That(result).IsEqualTo(PathRemoveResult.PathRemoved);
+        _service.Received(1).SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
+    }
+
+    [Test]
+    public async Task RemoveApplicationXdgConfigDirectoryFromPath_When_Path_Does_Not_Exist_Returns_NotFound()
+    {
+        // Arrange
+        var appName = "MyCoolApp";
+        var xdgHome = "/home/user/.config";
+        var pathThatShouldBeRemoved = Path.Combine(xdgHome, appName);
+        var existingPath = "/usr/bin:/usr/local/bin"; // Path does not contain the target
+
+        _service.GetApplicationName().Returns(appName);
+        _service.GetXdgConfigHome().Returns(xdgHome);
+        _service.GetFullPath(pathThatShouldBeRemoved).Returns(pathThatShouldBeRemoved);
+        _service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User).Returns(existingPath);
+
+        // Act
+        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath(EnvironmentVariableTarget.User);
+
+        // Assert
+        await Assert.That(result).IsEqualTo(PathRemoveResult.PathNotFound);
+        _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default, default, default);
+    }
+
+    [Test]
+    public async Task RemoveApplicationXdgConfigDirectoryFromPath_When_AppName_Is_Unknown_Returns_Error()
+    {
+        // Arrange
+        _service.GetApplicationName().Returns((string?)null);
+
+        // Act
+        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath();
+
+        // Assert
+        await Assert.That(result).IsEqualTo(PathRemoveResult.Error);
+        _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default, default, default);
     }
 }

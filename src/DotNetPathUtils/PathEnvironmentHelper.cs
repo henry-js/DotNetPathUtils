@@ -5,11 +5,16 @@ namespace DotNetPathUtils;
 public class PathEnvironmentHelper
 {
     private readonly IEnvironmentService _service;
-    private const string PathVariableName = "PATH";
+    private readonly string _pathVariableName;
 
-    public PathEnvironmentHelper(IEnvironmentService service)
+    public PathEnvironmentHelper(IEnvironmentService service) : this(service, "PATH")
+    {
+    }
+
+    internal PathEnvironmentHelper(IEnvironmentService service, string pathVariableName)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
+        _pathVariableName = pathVariableName ?? throw new ArgumentNullException(nameof(pathVariableName));
     }
 
     public PathUpdateResult EnsureApplicationXdgConfigDirectoryIsInPath(EnvironmentVariableTarget target = EnvironmentVariableTarget.User)
@@ -30,12 +35,12 @@ public class PathEnvironmentHelper
     {
         if (string.IsNullOrWhiteSpace(directoryPath))
             throw new ArgumentNullException(nameof(directoryPath));
-        if (target == EnvironmentVariableTarget.Process)
-            throw new ArgumentException("Process target is not supported for persistent changes.", nameof(target));
+        if (target == EnvironmentVariableTarget.Process && _pathVariableName.Equals("PATH", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Process target is not supported for persistent PATH changes. Use User or Machine for persistence.", nameof(target));
 
         string normalizedDirectoryToAdd = _service.GetFullPath(directoryPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-        string? currentPathVariable = _service.GetEnvironmentVariable(PathVariableName, target);
+        string? currentPathVariable = _service.GetEnvironmentVariable(_pathVariableName, target);
         var paths = new List<string>(currentPathVariable?.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? []);
 
         bool pathExists = paths.Any(p =>
@@ -58,7 +63,7 @@ public class PathEnvironmentHelper
 
         try
         {
-            _service.SetEnvironmentVariable(PathVariableName, newPathVariable, target);
+            _service.SetEnvironmentVariable(_pathVariableName, newPathVariable, target);
             if (_service.IsWindows())
             {
                 _service.BroadcastEnvironmentChange();
@@ -69,5 +74,49 @@ public class PathEnvironmentHelper
         {
             throw new SecurityException($"Failed to set {target} PATH variable. Administrator privileges may be required.", ex);
         }
+    }
+
+    public PathRemoveResult RemoveApplicationXdgConfigDirectoryFromPath(EnvironmentVariableTarget target = EnvironmentVariableTarget.User)
+    {
+        // This method should also be updated to use the generic RemoveDirectoryFromPath
+        string? appName = _service.GetApplicationName();
+        if (string.IsNullOrWhiteSpace(appName)) return PathRemoveResult.Error;
+
+        string configHome = _service.GetXdgConfigHome();
+        if (string.IsNullOrWhiteSpace(configHome)) return PathRemoveResult.Error;
+
+        string appConfigPath = Path.Combine(configHome, appName);
+        return RemoveDirectoryFromPath(appConfigPath, target);
+    }
+
+    public PathRemoveResult RemoveDirectoryFromPath(string directoryPath, EnvironmentVariableTarget target = EnvironmentVariableTarget.User)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath)) throw new ArgumentNullException(nameof(directoryPath));
+
+        string normalizedPathToRemove = _service.GetFullPath(directoryPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        string? currentPathVariable = _service.GetEnvironmentVariable(_pathVariableName, target);
+        if (string.IsNullOrEmpty(currentPathVariable)) return PathRemoveResult.PathNotFound;
+
+        var paths = new List<string>(currentPathVariable.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
+
+        int itemsRemoved = paths.RemoveAll(p =>
+        {
+            try
+            {
+                return _service.GetFullPath(p).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                               .Equals(normalizedPathToRemove, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        });
+
+        if (itemsRemoved == 0) return PathRemoveResult.PathNotFound;
+
+        string newPathVariable = string.Join(Path.PathSeparator.ToString(), paths);
+        _service.SetEnvironmentVariable(_pathVariableName, newPathVariable, target);
+
+        if (_service.IsWindows()) _service.BroadcastEnvironmentChange();
+
+        return PathRemoveResult.PathRemoved;
     }
 }
