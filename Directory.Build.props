@@ -1,10 +1,8 @@
 <Project>
   <!-- See https://aka.ms/dotnet/msbuild/customize for more details on customizing your build -->
   <PropertyGroup>
-    <!-- Configures the 'v' prefix for tags (e.g., "v1.2.3"). MinVer will strip the 'v' to get the version. -->
-    <MinVerTagPrefix>v</MinVerTagPrefix>
-
     <!-- Sets the verbosity for MinVer build output. Useful for debugging. -->
+    <MinVerDefaultPreReleaseIdentifiers>preview</MinVerDefaultPreReleaseIdentifiers>
     <MinVerVerbosity>normal</MinVerVerbosity>
   </PropertyGroup>
 

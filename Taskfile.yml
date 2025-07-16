@@ -1,7 +1,7 @@
 # https://taskfile.dev
 version: "3"
 
-dotenv: [".env"]
+dotenv: ["public.env", ".env"]
 
 # This Taskfile sources its configuration from a .env file in the root directory.
 # To get started, copy .env.example to .env and customize it for your project.
@@ -59,6 +59,21 @@ tasks:
     cmds:
       - task: dotnet:publish-app
 
+  setup:
+    desc: "Restores local .NET tools defined in the manifest"
+    cmds:
+      - dotnet tool restore
+    preconditions:
+      - sh: "[ -f .config/dotnet-tools.json ]"
+        msg: "Tool manifest '.config/dotnet-tools.json' not found."
+
+  get-version:
+    # This internal task gets the version from MinVer and makes it available
+    # to other tasks as {{.GET_VERSION}}.
+    cmds:
+      - dotnet minver --default-pre-release-identifiers preview -v error
+    # deps: [setup]
+
   pack:nuget:
     desc: "Packs the project as a NuGet package (for libraries)"
     preconditions:
@@ -73,20 +88,20 @@ tasks:
     cmds:
       - task: dotnet:pack-nuget
 
-  setup:
-    desc: "Restores local .NET tools defined in the manifest"
-    cmds:
-      - dotnet tool restore
+  push:nuget:
+    desc: "Packs and pushes the library to a NuGet feed"
+    deps: [pack:nuget]
     preconditions:
-      - sh: "[ -f .config/dotnet-tools.json ]"
-        msg: "Tool manifest '.config/dotnet-tools.json' not found."
-
-  get-version:
-    # This internal task gets the version from MinVer and makes it available
-    # to other tasks as {{.GET_VERSION}}.
+      # Precondition to ensure the API key is set
+      - sh: |
+          {{if eq .OS "windows"}}
+            powershell -Command "exit !($env:NUGET_API_KEY)"
+          {{else}}
+            [ -n "$NUGET_API_KEY" ]
+          {{end}}
+        msg: "NUGET_API_KEY is not set. Please add it to .env"
     cmds:
-      - dotnet minver --tag-prefix v
-    deps: [setup]
+      - task: dotnet:push-nuget
 
   pack:velopack:
     desc: "Packages the executable application using Velopack"
