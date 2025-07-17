@@ -2,7 +2,7 @@
   <!-- See https://aka.ms/dotnet/msbuild/customize for more details on customizing your build -->
   <PropertyGroup>
     <!-- Sets the verbosity for MinVer build output. Useful for debugging. -->
-    <MinVerDefaultPreReleaseIdentifiers>preview</MinVerDefaultPreReleaseIdentifiers>
+    <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
     <MinVerVerbosity>normal</MinVerVerbosity>
   </PropertyGroup>
 
