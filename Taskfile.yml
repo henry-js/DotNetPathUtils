@@ -65,7 +65,7 @@ tasks:
 
   get-version:
     cmds:
-      - dotnet minver --default-pre-release-identifiers preview -v error
+      - dotnet minver --default-pre-release-identifiers preview.0 -v error
     # deps: [setup]
 
   pack:nuget:
