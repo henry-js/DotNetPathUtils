@@ -49,7 +49,6 @@ tasks:
   # This task is specifically for creating a NuGet package from a library
   pack-nuget:
     desc: "Packs the project as a NuGet package"
-    deps: [test]
     vars:
       PROJECT_TO_PACK: "{{.PROJECT_TO_PACK}}"
     cmds:
