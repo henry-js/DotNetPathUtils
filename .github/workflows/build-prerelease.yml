@@ -52,7 +52,7 @@ jobs:
           if [[ -n "$PROJECT_TO_PUBLISH" ]]; then
             echo "Project is an application. Publishing files..."
             # Note: We specify the RID for the build here
-            task publish-app -- --RID win-x64
+            task pack:velopack
           fi
 
       - name: Upload Build Artifacts for Inspection
