@@ -18,7 +18,7 @@ tasks:
         msg: "Velopack icon not found at '{{.ICON_PATH}}'. Check ICON_PATH in .env."
     cmds:
       - |
-        vpk pack \
+        vpk [win] pack \
           --packId {{.APP_NAME}} \
           --packVersion {{.APP_VERSION}} \
           --packDir "{{.PUBLISH_DIR}}" \
