@@ -1,0 +1,81 @@
+name: Publish Stable Release
+
+on:
+  push:
+    tags:
+      # Trigger on tags like 1.0.0, 1.2.3, 1.2.3-rc1 etc.
+      # Does NOT match 'v' prefix.
+      - '[0-9]+.[0-9]+.[0-9]+*'
+
+# Grant permissions for the GITHUB_TOKEN to create releases.
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Setup Taskfile
+        uses: arduino/setup-task@v2
+
+      - name: Create .env file with secrets
+        run: |
+          cp public.env .env
+          echo "NUGET_API_KEY=${{ secrets.NUGET_API_KEY }}" >> .env
+
+      - name: Get stable version from tag
+        id: version
+        run: echo "version=$(task get-version)" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # github.ref_name is the tag that triggered the workflow (e.g., "1.0.0")
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: "Stable release for version ${{ steps.version.outputs.version }}."
+
+      - name: Run Tests
+        run: task test
+
+      # --- Conditional Publish: Library ---
+      - name: Pack and Push NuGet Package
+        # This single task will trigger both packing and pushing due to its deps
+        if: env.PROJECT_TO_PACK != ''
+        env:
+          PROJECT_TO_PACK: "" # Will be read by the 'source' command
+        run: |
+          source public.env
+          if [[ -n "$PROJECT_TO_PACK" ]]; then
+            task push:nuget
+          fi
+
+      # --- Conditional Publish: Application ---
+      - name: Pack and Upload Velopack Release
+        if: env.PROJECT_TO_PUBLISH != ''
+        env:
+          PROJECT_TO_PUBLISH: "" # Will be read by the 'source' command
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          RID: win-x64
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source public.env
+          if [[ -n "$PROJECT_TO_PUBLISH" ]]; then
+            # The pack:velopack task handles building the release
+            task pack:velopack
+            # The gh CLI handles uploading the assets
+            gh release upload ${{ github.ref_name }} ./dist/releases/*
+          fi
