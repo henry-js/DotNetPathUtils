@@ -1,0 +1,63 @@
+﻿name: Build Pre-release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  build:
+    name: Build & Test Pre-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Fetches all history and tags, essential for MinVer.
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # Assumes you have a global.json. If not, specify a version.
+          global-json-file: global.json
+
+      - name: Setup Taskfile
+        uses: arduino/setup-task@v2
+
+      - name: Create .env file for Task
+        run: cp public.env .env
+
+      - name: Restore .NET local tools
+        run: task setup
+
+      - name: Get pre-release version
+        id: version
+        run: echo "version=$(task get-version)" >> $GITHUB_OUTPUT
+
+      - name: Run Tests
+        run: task test
+
+      - name: Package based on project type
+        run: |
+          # Load variables from the env file into the shell
+          source public.env
+
+          if [[ -n "$PROJECT_TO_PACK" ]]; then
+            echo "Project is a library. Packing NuGet package..."
+            task pack:nuget
+          fi
+
+          if [[ -n "$PROJECT_TO_PUBLISH" ]]; then
+            echo "Project is an application. Publishing files..."
+            # Note: We specify the RID for the build here
+            task publish-app -- --RID win-x64
+          fi
+
+      - name: Upload Build Artifacts for Inspection
+        uses: actions/upload-artifact@v4
+        with:
+          # Name the artifact with the version for easy identification
+          name: dist-${{ steps.version.outputs.version }}
+          path: dist/
