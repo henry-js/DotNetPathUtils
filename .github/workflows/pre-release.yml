@@ -1,0 +1,60 @@
+name: Build Pre-release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Test Pre-release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.minver.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 is still important for version calculation
+          fetch-depth: 0
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Setup Taskfile
+        uses: arduino/setup-task@v2
+      - name: Create .env file
+        run: cp public.env .env
+      - name: Restore .NET local tools
+        run: task setup
+      - name: Get pre-release version
+        id: minver
+        run: echo "version=$(task get-version)" >> $GITHUB_OUTPUT
+      - name: Run Tests
+        run: task test
+      - name: Package Nuget (if library)
+        if: env.PROJECT_TO_PACK != ''
+        env:
+          PROJECT_TO_PACK: ""
+        run: |
+          source public.env
+          if [[ -n "$PROJECT_TO_PACK" ]]; then task pack:nuget; fi
+      - name: Publish App (if application)
+        if: env.PROJECT_TO_PUBLISH != ''
+        env:
+          PROJECT_TO_PUBLISH: ""
+        run: |
+          source public.env
+          if [[ -n "$PROJECT_TO_PUBLISH" ]]; then task publish-app -- --RID win-x64; fi
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          # Name the artifact with the pre-release version for clarity
+          name: dist-${{ steps.minver.outputs.version }}
+          path: dist/
+      #
+      # Note: We NO LONGER create a GitHub Release here.
+      # You could optionally add a step to push the pre-release
+      # NuGet package to a separate feed.
+      #
