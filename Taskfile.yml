@@ -97,7 +97,7 @@ tasks:
 
   pack:velopack:
     desc: "Packages the executable application using Velopack"
-    deps: [publish-app]
+    deps: [setup-velopack, publish-app]
     vars:
       APP_VERSION:
         sh: task get-version
@@ -113,3 +113,8 @@ tasks:
       - task: velopack:pack
         vars:
           APP_VERSION: "{{.APP_VERSION}}"
+  setup-velopack:
+    desc: "Sets up Velopack environment"
+    cmds:
+      - |
+        dotnet tool install --global vpk
