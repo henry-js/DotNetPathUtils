@@ -111,3 +111,5 @@ tasks:
         msg: "Not an executable application. Set PROJECT_TO_PUBLISH in .env to enable."
     cmds:
       - task: velopack:pack
+        vars:
+          APP_VERSION: "{{.APP_VERSION}}"

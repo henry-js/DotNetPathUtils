@@ -260,7 +260,7 @@ public class PathEnvironmentHelperTests
 
         // Assert
         await Assert.That(result).IsEqualTo(PathRemoveResult.PathNotFound);
-        _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default, default, default);
+        _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
     }
 
     [Test]
@@ -274,6 +274,6 @@ public class PathEnvironmentHelperTests
 
         // Assert
         await Assert.That(result).IsEqualTo(PathRemoveResult.Error);
-        _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default, default, default);
+        _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
     }
 }
