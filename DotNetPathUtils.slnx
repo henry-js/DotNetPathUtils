@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DotNetPathUtils.Console/DotNetPathUtils.Console.csproj" />
+    <Project Path="src/DotNetPathUtils.Tests/DotNetPathUtils.Tests.csproj" />
+    <Project Path="src/DotNetPathUtils/DotNetPathUtils.csproj" />
+  </Folder>
+</Solution>

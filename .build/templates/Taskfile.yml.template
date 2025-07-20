@@ -1,0 +1,122 @@
+# https://taskfile.dev
+version: "3"
+
+dotenv: ["public.env", ".env"]
+
+# This Taskfile sources its configuration from a .env file in the root directory.
+# To get started, copy .env.example to .env and customize it for your project.
+vars:
+  MAIN_EXE: "{{if .PROJECT_TO_PUBLISH}}{{.APP_NAME}}.exe{{end}}"
+
+includes:
+  dotnet: ./.build/dotnet/Taskfile.yml
+  velopack:
+    taskfile: ./.build/velopack/Taskfile.yml
+    optional: true
+    internal: true
+
+tasks:
+  default:
+    desc: "Builds the entire solution (run this first!)"
+    preconditions:
+      - sh: |
+          {{if eq .OS "windows"}}
+            powershell -Command "exit !(Test-Path .env -PathType Leaf)"
+          {{else}}
+            [ -f .env ]
+          {{end}}
+        msg: "Configuration file not found. Please copy '.env.example' to '.env' and fill it out."
+    cmds:
+      - task: build
+
+  clean:
+    desc: "Cleans the solution"
+    cmds:
+      - task: dotnet:clean
+
+  build:
+    desc: "Builds the solution"
+    cmds:
+      - task: dotnet:build
+
+  test:
+    desc: "Runs all tests"
+    cmds:
+      - task: dotnet:test
+
+  # --- Publishing and Packing Tasks ---
+  publish-app:
+    desc: "Publishes the main executable project files"
+    preconditions:
+      # Precondition now directly checks if the variable is set.
+      - sh: |
+          {{if eq .OS "windows"}}
+            powershell -Command "exit !($env:PROJECT_TO_PUBLISH)"
+          {{else}}
+            [ -n "$PROJECT_TO_PUBLISH" ]
+          {{end}}
+        msg: "Not an executable application. Set PROJECT_TO_PUBLISH in .env to enable."
+    cmds:
+      - task: dotnet:publish-app
+
+  setup:
+    desc: "Restores local .NET tools defined in the manifest"
+    cmds:
+      - dotnet tool restore
+    preconditions:
+      - sh: "[ -f .config/dotnet-tools.json ]"
+        msg: "Tool manifest '.config/dotnet-tools.json' not found."
+
+  get-version:
+    # This internal task gets the version from MinVer and makes it available
+    # to other tasks as {{.GET_VERSION}}.
+    cmds:
+      - dotnet minver --tag-prefix v
+    deps: [setup]
+
+  pack:nuget:
+    desc: "Packs the project as a NuGet package (for libraries)"
+    preconditions:
+      # Precondition now directly checks if the variable is set.
+      - sh: |
+          {{if eq .OS "windows"}}
+            powershell -Command "exit !($env:PROJECT_TO_PACK)"
+          {{else}}
+            [ -n "$PROJECT_TO_PACK" ]
+          {{end}}
+        msg: "Not a library project. Set PROJECT_TO_PACK in .env to enable."
+    cmds:
+      - task: dotnet:pack-nuget
+
+  push:nuget:
+    desc: "Packs and pushes the library to a NuGet feed"
+    deps: [pack:nuget]
+    preconditions:
+      # Precondition to ensure the API key is set
+      - sh: |
+          {{if eq .OS "windows"}}
+            powershell -Command "exit !($env:NUGET_API_KEY)"
+          {{else}}
+            [ -n "$NUGET_API_KEY" ]
+          {{end}}
+        msg: "NUGET_API_KEY is not set. Please add it to .env"
+    cmds:
+      - task: dotnet:push-nuget
+
+  pack:velopack:
+    desc: "Packages the executable application using Velopack"
+    deps: [publish-app]
+    vars:
+      APP_VERSION:
+        sh: task get-version
+    preconditions:
+      # Precondition remains the same, checking for PROJECT_TO_PUBLISH.
+      - sh: |
+          {{if eq .OS "windows"}}
+            powershell -Command "exit !($env:PROJECT_TO_PUBLISH)"
+          {{else}}
+            [ -n "$PROJECT_TO_PUBLISH" ]
+          {{end}}
+        msg: "Not an executable application. Set PROJECT_TO_PUBLISH in .env to enable."
+    cmds:
+      - task: velopack:pack
