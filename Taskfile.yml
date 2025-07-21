@@ -85,13 +85,10 @@ tasks:
     desc: "Packs and pushes the library to a NuGet feed"
     deps: [pack:nuget]
     preconditions:
-      - sh: |
-          {{if eq .OS "windows"}}
-            powershell -Command "exit !($env:NUGET_API_KEY)"
-          {{else}}
-            [ -n "$NUGET_API_KEY" ]
-          {{end}}
-        msg: "NUGET_API_KEY is not set. Please add it to .env"
+      # This directly checks if the variable exists and is not empty
+      # inside Taskfile itself, without using a subshell.
+      - "{{.NUGET_API_KEY}}"
+      - msg: "NUGET_API_KEY is not set. Please add it to .env or pass it to the CI workflow."
     cmds:
       - task: dotnet:push-nuget
 
