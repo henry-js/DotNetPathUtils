@@ -118,3 +118,31 @@ tasks:
     cmds:
       - |
         dotnet tool install --global vpk
+  release:
+    desc: "Builds, tests, and releases the project based on .env configuration."
+    cmds:
+      - task: _release:nuget
+      - task: _release:velopack
+
+  # --- THESE ARE THE NEW INTERNAL HELPER TASKS ---
+  _release:nuget:
+    internal: true
+    # This precondition checks if PROJECT_TO_PACK is set in your .env file
+    preconditions:
+      - sh: '[ -n "$PROJECT_TO_PACK" ]'
+        msg: "Skipping NuGet release: PROJECT_TO_PACK is not set."
+    cmds:
+      - task: push:nuget
+
+  _release:velopack:
+    internal: true
+    # This precondition checks if PROJECT_TO_PUBLISH is set in your .env file
+    preconditions:
+      - sh: '[ -n "$PROJECT_TO_PUBLISH" ]'
+        msg: "Skipping Velopack release: PROJECT_TO_PUBLISH is not set."
+    cmds:
+      - task: pack:velopack
+        vars:
+          # Pass the version from the root vars down to the velopack task
+          APP_VERSION: "{{.APP_VERSION}}"
+      - task: upload:release-assets

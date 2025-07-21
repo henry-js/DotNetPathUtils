@@ -3,11 +3,8 @@ name: Publish Stable Release
 on:
   push:
     tags:
-      # Trigger on tags like 1.0.0, 1.2.3, 1.2.3-rc1 etc.
-      # Does NOT match 'v' prefix.
       - '[0-9]+.[0-9]+.[0-9]+*'
 
-# Grant permissions for the GITHUB_TOKEN to create releases.
 permissions:
   contents: write
 
@@ -43,7 +40,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # github.ref_name is the tag that triggered the workflow (e.g., "1.0.0")
           tag_name: ${{ github.ref_name }}
           release_name: Release ${{ github.ref_name }}
           body: "Stable release for version ${{ steps.version.outputs.version }}."
@@ -51,38 +47,11 @@ jobs:
       - name: Run Tests
         run: task test
 
-      - name: Pack, Push, and Upload Artifacts
+      - name: Execute Smart Release
         env:
-          # Pass the version and token into the shell environment for this step
-          APP_VERSION: ${{ steps.version.outputs.version }}
+          # The GITHUB_TOKEN is needed for the `gh` command inside the release task
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # --- Step 1: Load variables from file into the shell ---
-          echo "--- Loading environment variables from public.env ---"
-          source public.env
-
-          # --- Step 2: Echo variables for debugging ---
-          echo "DEBUG: Value of PROJECT_TO_PACK is '$PROJECT_TO_PACK'"
-          echo "DEBUG: Value of PROJECT_TO_PUBLISH is '$PROJECT_TO_PUBLISH'"
-          echo "DEBUG: Value of APP_VERSION is '$APP_VERSION'"
-
-          # --- Step 3: Conditional NuGet push ---
-          if [[ -n "$PROJECT_TO_PACK" ]]; then
-            echo "--- Project is a library. Pushing to NuGet... ---"
-            task push:nuget
-          else
-            echo "--- Skipping NuGet push (PROJECT_TO_PACK is not set) ---"
-          fi
-
-          # --- Step 4: Conditional Velopack build and upload ---
-          if [[ -n "$PROJECT_TO_PUBLISH" ]]; then
-            echo "--- Project is an application. Packing Velopack release... ---"
-            # We pass variables directly to the task command.
-            # Using RID win-x64 as a placeholder for cross-compilation.
-            task pack:velopack APP_VERSION=$APP_VERSION RID=win-x64
-
-            echo "--- Uploading Velopack assets to GitHub Release... ---"
-            gh release upload ${{ github.ref_name }} ./dist/releases/*
-          else
-            echo "--- Skipping Velopack steps (PROJECT_TO_PUBLISH is not set) ---"
-          fi
+          # Call the single, top-level release task and pass in the
+          # CI-specific variables it needs.
+          task release APP_VERSION=${{ steps.version.outputs.version }} GITHUB_REF_NAME=${{ github.ref_name }}
