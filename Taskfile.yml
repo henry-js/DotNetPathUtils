@@ -129,7 +129,12 @@ tasks:
     internal: true
     # This precondition checks if PROJECT_TO_PACK is set in your .env file
     preconditions:
-      - sh: '[ -n "$PROJECT_TO_PACK" ]'
+      - sh: |
+          {{if eq .OS "windows"}}
+            powershell -Command "exit !($env:PROJECT_TO_PACK)"
+          {{else}}
+            [ -n "$PROJECT_TO_PACK" ]
+          {{end}}
         msg: "Skipping NuGet release: PROJECT_TO_PACK is not set."
     cmds:
       - task: push:nuget
@@ -138,7 +143,12 @@ tasks:
     internal: true
     # This precondition checks if PROJECT_TO_PUBLISH is set in your .env file
     preconditions:
-      - sh: '[ -n "$PROJECT_TO_PUBLISH" ]'
+      - sh: |
+          {{if eq .OS "windows"}}
+            powershell -Command "exit !($env:PROJECT_TO_PUBLISH)"
+          {{else}}
+            [ -n "$PROJECT_TO_PUBLISH" ]
+          {{end}}
         msg: "Skipping Velopack release: PROJECT_TO_PUBLISH is not set."
     cmds:
       - task: pack:velopack
@@ -146,3 +156,7 @@ tasks:
           # Pass the version from the root vars down to the velopack task
           APP_VERSION: "{{.APP_VERSION}}"
       - task: upload:release-assets
+  upload:release-assets:
+    internal: true
+    cmds:
+      - gh release upload {{.GITHUB_REF_NAME}} ./dist/releases/*

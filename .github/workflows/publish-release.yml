@@ -27,6 +27,7 @@ jobs:
         uses: arduino/setup-task@v2
 
       - name: Create .env file with secrets
+        
         run: |
           cp public.env .env
           echo "NUGET_API_KEY=${{ secrets.NUGET_API_KEY }}" >> .env
@@ -54,4 +55,4 @@ jobs:
         run: |
           # Call the single, top-level release task and pass in the
           # CI-specific variables it needs.
-          task release APP_VERSION=${{ steps.version.outputs.version }} GITHUB_REF_NAME=${{ github.ref_name }}
+          task release GITHUB_REF_NAME=${{ github.ref_name }}
