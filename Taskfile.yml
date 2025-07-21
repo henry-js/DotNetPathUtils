@@ -87,7 +87,7 @@ tasks:
     preconditions:
       # This directly checks if the variable exists and is not empty
       # inside Taskfile itself, without using a subshell.
-      - "{{.NUGET_API_KEY}}"
+      - '{{ ne .NUGET_API_KEY "" }}'
       - msg: "NUGET_API_KEY is not set. Please add it to .env or pass it to the CI workflow."
     cmds:
       - task: dotnet:push-nuget
