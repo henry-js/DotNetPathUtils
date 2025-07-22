@@ -7,7 +7,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Job 1: Check the configuration to see if we're a library, an app, or both.
   check-config:
     name: Check Project Configuration
     runs-on: ubuntu-latest
@@ -22,41 +21,23 @@ jobs:
       - name: Read configuration from public.env
         id: check_file
         run: |
-          # Initialize variables to false
           IS_LIBRARY="false"
           IS_APP="false"
-
-          echo "--- Reading public.env ---"
-          # This robust loop reads the file line by line, ignoring line endings
           while IFS= read -r line || [[ -n "$line" ]]; do
-            # Use case statement for clean matching
             case "$line" in
-              # Match lines that start with "PROJECT_TO_PACK=" and have a value after it
               PROJECT_TO_PACK=*)
                 value="${line#*=}"
-                if [[ -n "$value" ]]; then
-                  echo "Found non-empty PROJECT_TO_PACK"
-                  IS_LIBRARY="true"
-                fi
+                if [[ -n "$value" ]]; then IS_LIBRARY="true"; fi
                 ;;
-              # Match lines that start with "PROJECT_TO_PUBLISH=" and have a value after it
               PROJECT_TO_PUBLISH=*)
                 value="${line#*=}"
-                if [[ -n "$value" ]]; then
-                  echo "Found non-empty PROJECT_TO_PUBLISH"
-                  IS_APP="true"
-                fi
+                if [[ -n "$value" ]]; then IS_APP="true"; fi
                 ;;
             esac
           done < public.env
-
-          echo "--- Setting outputs ---"
           echo "is_library=${IS_LIBRARY}" >> $GITHUB_OUTPUT
           echo "is_app=${IS_APP}" >> $GITHUB_OUTPUT
-          echo "is_library is ${IS_LIBRARY}"
-          echo "is_app is ${IS_APP}"
 
-  # Job 2: Build the NuGet package pre-release, if configured.
   build-library:
     name: Build NuGet Pre-release
     needs: check-config
@@ -72,12 +53,8 @@ jobs:
         uses: arduino/setup-task@v2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Get pre-release version
-        id: version
-        run: echo "version=$(task get-version)" >> $GITHUB_OUTPUT
-      - name: Add .NET tools to PATH
-        if: runner.os != 'Windows' # This step is only needed on Linux and macOS
-        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+      - name: Get pre-release version and set ENV
+        run: echo "APP_VERSION=$(task get-version)" >> $GITHUB_ENV
       - name: Run Tests
         run: task test
       - name: Pack NuGet Pre-release Package
@@ -85,17 +62,16 @@ jobs:
       - name: Upload NuGet Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nuget-artifact-${{ steps.version.outputs.version }}
+          name: nuget-artifact-${{ env.APP_VERSION }}
           path: dist/nuget/
 
-  # Job 3: Build the application on a matrix, if configured.
   build-application:
     name: Build App for ${{ matrix.os }}-${{ matrix.arch }}
     needs: check-config
     if: needs.check-config.outputs.is_app == 'true'
     runs-on: ${{ matrix.runner_os }}
     strategy:
-      fail-fast: false # Allows all platform builds to finish even if one fails
+      fail-fast: false 
       matrix:
         include:
           - { runner_os: windows-latest, os: win, arch: x64 }
@@ -108,6 +84,11 @@ jobs:
         uses: actions/setup-dotnet@v4
       - name: Setup Taskfile
         uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add .NET tools to PATH
+        if: runner.os != 'Windows'
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
       - name: Get pre-release version and set ENV
         run: echo "APP_VERSION=$(task get-version)" >> $GITHUB_ENV
       - name: Run Tests
