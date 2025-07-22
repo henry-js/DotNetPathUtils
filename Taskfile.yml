@@ -56,7 +56,10 @@ tasks:
     cmds: [{ task: dotnet:pack-nuget }]
   push-nuget:
     deps: ["pack-nuget"]
-    preconditions: ['{{ ne .NUGET_API_KEY "" }}']
+    preconditions:
+      - '{{ ne .NUGET_API_KEY "" }}'
+      - sh: git describe --tags --exact-match &>/dev/null
+        msg: "Skipping NuGet push: This is a pre-release version (git height > 0)."
     cmds: [{ task: dotnet:push-nuget }]
 
   # --- CI Entrypoint for Building a Single Platform ---
