@@ -97,9 +97,12 @@ jobs:
           tag_name: ${{ github.ref_name }}
           release_name: Release ${{ github.ref_name }}
 
-  build-velopack:
-    name: Build for ${{ matrix.os }}-${{ matrix.arch }}
-    needs: release-velopack
+  # Job 4: Build the application on a matrix.
+  build-and-publish-velopack:
+    name: Build & Publish for ${{ matrix.os }}-${{ matrix.arch }}
+    needs: release-velopack # Depends on the release placeholder being created.
+    # The 'if' condition is inherited from the 'needs' dependency.
+    # If release-velopack is skipped, this job will also be skipped.
     runs-on: ${{ matrix.runner_os }}
     strategy:
       matrix:
@@ -115,11 +118,11 @@ jobs:
         uses: arduino/setup-task@v2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run Tests
-        run: task test
       - name: Add .NET tools to PATH
         if: runner.os != 'Windows'
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+      - name: Run Tests
+        run: task test
       - name: Build and Pack for ${{ matrix.os }}-${{ matrix.arch }}
         run: task build-platform-release OS=${{ matrix.os }} ARCH=${{ matrix.arch }} APP_VERSION=${{ github.ref_name }}
       - name: Upload Artifacts
@@ -156,3 +159,4 @@ jobs:
 
           # Use xargs to pass the list of files to the gh command.
           echo "$FILES_TO_UPLOAD" | xargs gh release upload ${{ github.ref_name }} --clobber
+
