@@ -111,10 +111,9 @@ jobs:
       - name: Run Tests
         run: task test
       - name: Build and Pack Pre-release for ${{ matrix.os }}-${{ matrix.arch }}
-        run: task build-platform-release OS=${{ matrix.os }} ARCH=${{ matrix.arch }} APP_VERSION=$APP_VERSION
-        shell: bash
+        run: task build-platform-release OS=${{ matrix.os }} ARCH=${{ matrix.arch }} APP_VERSION=${{ env.APP_VERSION }}
       - name: Upload Application Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-artifact-${{ matrix.os }}-${{ matrix.arch }}-$APP_VERSION
+          name: app-artifact-${{ matrix.os }}-${{ matrix.arch }}-${{ env.APP_VERSION }}
           path: dist/releases/
