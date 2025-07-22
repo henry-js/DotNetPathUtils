@@ -97,6 +97,8 @@ jobs:
         uses: actions/setup-dotnet@v4
       - name: Setup Taskfile
         uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Tests
         run: task test
       - name: Add .NET tools to PATH
