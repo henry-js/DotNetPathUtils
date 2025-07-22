@@ -6,6 +6,7 @@ vars:
   CONFIGURATION: '{{.CONFIGURATION | default "Release"}}'
   OUTPUT_DIR: '{{.OUTPUT_DIR | default "dist"}}'
   NUGET_OUTPUT_DIR: "{{.OUTPUT_DIR}}/nuget"
+
 tasks:
   # ... (clean, restore, build, test are unchanged) ...
   clean:
@@ -36,9 +37,12 @@ tasks:
     deps: [clean]
     vars:
       PROJECT_TO_PUBLISH: "{{.PROJECT_TO_PUBLISH}}"
-      RID: "{{.RID}}"
+      OS: "{{.OS}}"
+      ARCH: "{{.ARCH}}"
+      RID: "{{.OS}}-{{.ARCH}}"
       PUBLISH_DIR: "{{.OUTPUT_DIR}}/publish/{{.RID}}"
     cmds:
+      - echo "Publishing {{.PROJECT_TO_PUBLISH}} for {{.OS}}/{{.ARCH}} to {{.PUBLISH_DIR}}"
       - dotnet publish "src/{{.PROJECT_TO_PUBLISH}}" -c {{.CONFIGURATION}} -r {{.RID}} -o "{{.PUBLISH_DIR}}"
     preconditions:
       - sh: 'test -n "{{.PROJECT_TO_PUBLISH}}"'

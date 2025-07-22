@@ -5,17 +5,20 @@ dotenv: ["public.env", ".env"]
 
 vars:
   # These variables are now expected to be passed in from the CI/CD workflow.
-  APP_VERSION: "{{.APP_VERSION}}"
   GITHUB_REF_NAME: "{{.GITHUB_REF_NAME}}"
   # This remains for local use if needed.
   MAIN_EXE: "{{if .PROJECT_TO_PUBLISH}}{{.APP_NAME}}.exe{{end}}"
+  OS_LIST: ["win", "linux"]
+  ARCH_LIST: ["x64"]
 
 includes:
   dotnet:
     taskfile: ./.build/dotnet/Taskfile.yml
+    internal: true
   velopack:
     taskfile: ./.build/velopack/Taskfile.yml
     optional: true
+    internal: true
 
 tasks:
   default:
@@ -29,10 +32,12 @@ tasks:
   test:
     cmds: [{ task: dotnet:test }]
   setup:
+    silent: true
     desc: "Restores local .NET tools defined in the manifest"
     preconditions:
       - "[ -f .config/dotnet-tools.json ]"
-    cmds: ["dotnet tool restore"]
+    cmds:
+      - cmd: dotnet tool restore > /dev/null
   get-version:
     desc: "Calculates the version from git history (for pre-release builds)"
     deps: ["setup"]
@@ -41,10 +46,16 @@ tasks:
   # --- Release Entrypoint (Called by CI) ---
   release:
     desc: "Publishes NuGet and/or Velopack releases based on configuration."
+    vars:
+      PRE_RELEASE_VERSION:
+        sh: task get-version
+      APP_VERSION: "{{.APP_VERSION | default .PRE_RELEASE_VERSION}}"
     cmds:
       - task: push-nuget
       - task: release-velopack
-
+        vars:
+          # 2. This is also a task-level variable being passed down.
+          APP_VERSION: "{{.APP_VERSION}}"
   # --- NuGet Publishing Logic ---
   pack-nuget:
     desc: "Packs the project as a NuGet package"
@@ -62,25 +73,47 @@ tasks:
       - msg: "NUGET_API_KEY is not set. Cannot push."
     cmds: [{ task: dotnet:push-nuget }]
 
-  # --- Velopack Publishing Logic ---
-  publish-app:
-    desc: "Publishes the main executable project files"
-    preconditions:
-      - '{{ ne .PROJECT_TO_PUBLISH "" }}'
-      - msg: "Skipping app publish: PROJECT_TO_PUBLISH is not set."
-    cmds: [{ task: dotnet:publish-app }]
   setup-velopack:
     desc: "Installs the Velopack CLI tool, if not already present"
     cmds: ["dotnet tool install --global vpk"]
     status: ["vpk --version"] # This prevents reinstalling if it's already there.
+
   release-velopack:
     desc: "Packs and uploads a Velopack release"
-    deps: ["setup-velopack", "publish-app"]
+    deps: ["setup-velopack"]
+    preconditions:
+      - '{{ ne .PROJECT_TO_PUBLISH "" }}'
+      - msg: "Skipping Velopack release: PROJECT_TO_PUBLISH is not set."
     cmds:
-      - task: velopack:pack
+      - for:
+          matrix:
+            OS:
+              ref: .OS_LIST
+            ARCH:
+              ref: .ARCH_LIST
+
+        task: _build-and-pack-platform
         vars:
-          APP_VERSION: "{{.APP_VERSION}}" # Passes version from root
+          OS: "{{.ITEM.OS}}"
+          ARCH: "{{.ITEM.ARCH}}"
+          APP_VERSION: "{{.APP_VERSION}}"
       - task: upload:assets
+
   upload-assets:
     desc: "Uploads release assets to GitHub"
     cmds: ["gh release upload {{.GITHUB_REF_NAME}} ./dist/releases/*"]
+
+  _build-and-pack-platform:
+    desc: "Builds the Velopack package for a specific RID"
+    cmds:
+      - echo "Building Velopack package for {{.OS}}/{{.ARCH}}"
+      - task: dotnet:publish-app
+        vars:
+          PROJECT_TO_PUBLISH: "{{.PROJECT_TO_PUBLISH}}"
+          OS: "{{.OS}}"
+          ARCH: "{{.ARCH}}"
+      - task: velopack:pack
+        vars:
+          APP_VERSION: "{{.APP_VERSION}}"
+          OS: "{{.OS}}"
+          ARCH: "{{.ARCH}}"
