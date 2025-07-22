@@ -98,7 +98,6 @@ jobs:
         include:
           - { runner_os: windows-latest, os: win, arch: x64 }
           - { runner_os: ubuntu-latest, os: linux, arch: x64 }
-          - { runner_os: macos-latest, os: osx, arch: x64 }
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -107,16 +106,15 @@ jobs:
         uses: actions/setup-dotnet@v4
       - name: Setup Taskfile
         uses: arduino/setup-task@v2
-      - name: Get pre-release version
-        id: version
-        run: echo "version=$(task get-version)" >> $GITHUB_OUTPUT
+      - name: Get pre-release version and set ENV
+        run: echo "APP_VERSION=$(task get-version)" >> $GITHUB_ENV
       - name: Run Tests
         run: task test
       - name: Build and Pack Pre-release for ${{ matrix.os }}-${{ matrix.arch }}
-        # This now correctly calls your CI-specific task.
-        run: task build-platform-release OS=${{ matrix.os }} ARCH=${{ matrix.arch }} APP_VERSION=${{ steps.version.outputs.version }}
+        run: task build-platform-release OS=${{ matrix.os }} ARCH=${{ matrix.arch }} APP_VERSION=$APP_VERSION
+        shell: bash
       - name: Upload Application Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-artifact-${{ matrix.os }}-${{ matrix.arch }}-${{ steps.version.outputs.version }}
+          name: app-artifact-${{ matrix.os }}-${{ matrix.arch }}-$APP_VERSION
           path: dist/releases/

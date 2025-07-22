@@ -90,7 +90,6 @@ jobs:
         include:
           - { runner_os: windows-latest, os: win, arch: x64 }
           - { runner_os: ubuntu-latest, os: linux, arch: x64 }
-          - { runner_os: macos-latest, os: osx, arch: x64 }
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
