@@ -4,156 +4,77 @@ version: "3"
 dotenv: ["public.env", ".env"]
 
 vars:
+  # These are now the ONLY variables expected from the CI/CD workflow.
+  APP_VERSION: '{{.APP_VERSION | default "0.0.1-local"}}'
+  GITHUB_REF_NAME: '{{.GITHUB_REF_NAME | default "0.0.1-local"}}'
+
   MAIN_EXE: "{{if .PROJECT_TO_PUBLISH}}{{.APP_NAME}}.exe{{end}}"
 
 includes:
-  dotnet: ./.build/dotnet/Taskfile.yml
+  dotnet: { taskfile: ./.build/dotnet/Taskfile.yml, internal: true }
   velopack:
-    taskfile: ./.build/velopack/Taskfile.yml
-    optional: true
-    internal: true
+    { taskfile: ./.build/velopack/Taskfile.yml, optional: true, internal: true }
 
 tasks:
   default:
-    desc: "Builds the entire solution (run this first!)"
-    preconditions:
-      - sh: |
-          {{if eq .OS "windows"}}
-            powershell -Command "exit !(Test-Path .env -PathType Leaf)"
-          {{else}}
-            [ -f .env ]
-          {{end}}
-        msg: "Configuration file not found. Please copy '.env.example' to '.env' and fill it out."
-    cmds:
-      - task: build
+    cmds: [{ task: build }]
 
   clean:
-    desc: "Cleans the solution"
-    cmds:
-      - task: dotnet:clean
-
+    cmds: [{ task: dotnet:clean }]
   build:
-    desc: "Builds the solution"
-    cmds:
-      - task: dotnet:build
-
+    cmds: [{ task: dotnet:build }]
   test:
-    desc: "Runs all tests"
-    cmds:
-      - task: dotnet:test
-
-  publish-app:
-    desc: "Publishes the main executable project files"
+    cmds: [{ task: dotnet:test }]
+  setup:
+    silent: true
+    desc: "Restores local .NET tools defined in the manifest"
     preconditions:
-      - sh: |
-          {{if eq .OS "windows"}}
-            powershell -Command "exit !($env:PROJECT_TO_PUBLISH)"
-          {{else}}
-            [ -n "$PROJECT_TO_PUBLISH" ]
-          {{end}}
-        msg: "Not an executable application. Set PROJECT_TO_PUBLISH in .env to enable."
+      - "[ -f .config/dotnet-tools.json ]"
+    cmds:
+      - cmd: dotnet tool restore > /dev/null
+  get-version:
+    desc: "Calculates the version from git history (for pre-release builds)"
+    deps: ["setup"]
+    cmds: ["dotnet minver --default-pre-release-identifiers preview.0 -v error"]
+
+  # --- Simplified Release Task (For Local Testing Only) ---
+  release:
+    desc: "(LOCAL ONLY) Builds a single platform release for testing."
+    vars:
+      PRE_RELEASE_VERSION: { sh: task get-version }
+      APP_VERSION: "{{.APP_VERSION | default .PRE_RELEASE_VERSION}}"
+    cmds:
+      - task: build-platform-release
+        vars:
+          OS: win
+          ARCH: x64 # Hardcoded for simple local testing
+          APP_VERSION: "{{.APP_VERSION}}"
+
+  # --- NuGet Publishing Logic (Unchanged) ---
+  pack-nuget:
+    preconditions: ['{{ ne .PROJECT_TO_PACK "" }}']
+    cmds: [{ task: dotnet:pack-nuget }]
+  push-nuget:
+    deps: ["pack-nuget"]
+    preconditions: ['{{ ne .NUGET_API_KEY "" }}']
+    cmds: [{ task: dotnet:push-nuget }]
+
+  # --- CI Entrypoint for Building a Single Platform ---
+  setup-velopack:
+    desc: "Installs the Velopack CLI tool, if not already present"
+    cmds: ["dotnet tool install --global vpk"]
+    status: ["vpk --help"]
+
+  build-platform-release:
+    desc: "(CI USE) Builds and packs a release for a single target platform (RID)."
+    deps: ["setup-velopack"]
+    preconditions:
+      - '{{ ne .PROJECT_TO_PUBLISH "" }}'
+      - '{{ ne .OS "" }}'
+      - '{{ ne .ARCH "" }}'
     cmds:
       - task: dotnet:publish-app
-
-  setup:
-    desc: "Restores local .NET tools defined in the manifest"
-    cmds:
-      - dotnet tool restore
-    preconditions:
-      - sh: "[ -f .config/dotnet-tools.json ]"
-        msg: "Tool manifest '.config/dotnet-tools.json' not found."
-
-  get-version:
-    cmds:
-      - dotnet minver --default-pre-release-identifiers preview.0 -v error
-    deps: [setup]
-
-  pack:nuget:
-    desc: "Packs the project as a NuGet package (for libraries)"
-    preconditions:
-      - sh: |
-          {{if eq .OS "windows"}}
-            powershell -Command "exit !($env:PROJECT_TO_PACK)"
-          {{else}}
-            [ -n "$PROJECT_TO_PACK" ]
-          {{end}}
-        msg: "Not a library project. Set PROJECT_TO_PACK in .env to enable."
-    cmds:
-      - task: dotnet:pack-nuget
-
-  push:nuget:
-    desc: "Packs and pushes the library to a NuGet feed"
-    deps: [pack:nuget]
-    preconditions:
-      # This directly checks if the variable exists and is not empty
-      # inside Taskfile itself, without using a subshell.
-      - '{{ ne .NUGET_API_KEY "" }}'
-      - msg: "NUGET_API_KEY is not set. Please add it to .env or pass it to the CI workflow."
-    cmds:
-      - task: dotnet:push-nuget
-
-  pack:velopack:
-    desc: "Packages the executable application using Velopack"
-    deps: [setup-velopack, publish-app]
-    vars:
-      APP_VERSION:
-        sh: task get-version
-    preconditions:
-      - sh: |
-          {{if eq .OS "windows"}}
-            powershell -Command "exit !($env:PROJECT_TO_PUBLISH)"
-          {{else}}
-            [ -n "$PROJECT_TO_PUBLISH" ]
-          {{end}}
-        msg: "Not an executable application. Set PROJECT_TO_PUBLISH in .env to enable."
-    cmds:
+        vars: { OS: "{{.OS}}", ARCH: "{{.ARCH}}" }
       - task: velopack:pack
         vars:
-          APP_VERSION: "{{.APP_VERSION}}"
-  setup-velopack:
-    desc: "Sets up Velopack environment"
-    cmds:
-      - |
-        dotnet tool install --global vpk
-  release:
-    desc: "Builds, tests, and releases the project based on .env configuration."
-    cmds:
-      - task: _release:nuget
-      - task: _release:velopack
-
-  # --- THESE ARE THE NEW INTERNAL HELPER TASKS ---
-  _release:nuget:
-    internal: true
-    # This precondition checks if PROJECT_TO_PACK is set in your .env file
-    preconditions:
-      - sh: |
-          {{if eq .OS "windows"}}
-            powershell -Command "exit !($env:PROJECT_TO_PACK)"
-          {{else}}
-            [ -n "$PROJECT_TO_PACK" ]
-          {{end}}
-        msg: "Skipping NuGet release: PROJECT_TO_PACK is not set."
-    cmds:
-      - task: push:nuget
-
-  _release:velopack:
-    internal: true
-    # This precondition checks if PROJECT_TO_PUBLISH is set in your .env file
-    preconditions:
-      - sh: |
-          {{if eq .OS "windows"}}
-            powershell -Command "exit !($env:PROJECT_TO_PUBLISH)"
-          {{else}}
-            [ -n "$PROJECT_TO_PUBLISH" ]
-          {{end}}
-        msg: "Skipping Velopack release: PROJECT_TO_PUBLISH is not set."
-    cmds:
-      - task: pack:velopack
-        vars:
-          # Pass the version from the root vars down to the velopack task
-          APP_VERSION: "{{.APP_VERSION}}"
-      - task: upload:release-assets
-  upload:release-assets:
-    internal: true
-    cmds:
-      - gh release upload {{.GITHUB_REF_NAME}} ./dist/releases/*
+          { OS: "{{.OS}}", ARCH: "{{.ARCH}}", APP_VERSION: "{{.APP_VERSION}}" }

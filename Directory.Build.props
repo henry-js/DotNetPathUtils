@@ -4,6 +4,8 @@
     <!-- Sets the verbosity for MinVer build output. Useful for debugging. -->
     <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
     <MinVerVerbosity>normal</MinVerVerbosity>
+    <Authors>henry-js</Authors>
+    <Company>henry-js</Company>
   </PropertyGroup>
 
   <ItemGroup>

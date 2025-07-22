@@ -9,54 +9,119 @@ permissions:
   contents: write
 
 jobs:
-  publish:
-    name: Build & Publish Release
+  # Job 1: Check the configuration and produce outputs for other jobs.
+  check-config:
+    name: Check Project Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      # These outputs will be available to other jobs via the 'needs' context.
+      is_library: ${{ steps.check_file.outputs.is_library }}
+      is_app: ${{ steps.check_file.outputs.is_app }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Read configuration from public.env
+        id: check_file
+        run: |
+          # Check for PROJECT_TO_PACK and set the first output
+          if grep -q "PROJECT_TO_PACK=.+" public.env; then
+            echo "is_library=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_library=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for PROJECT_TO_PUBLISH and set the second output
+          if grep -q "PROJECT_TO_PUBLISH=.+" public.env; then
+            echo "is_app=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_app=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Job 2: Publish NuGet package, if configured as a library.
+  release-nuget:
+    name: Publish NuGet Package
+    needs: check-config # This job depends on the check finishing first.
+    # This 'if' condition now correctly uses the 'needs' context.
+    if: needs.check-config.outputs.is_library == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
       - name: Setup Taskfile
         uses: arduino/setup-task@v2
-
+      - name: Add .NET tools to PATH
+        if: runner.os != 'Windows' # This step is only needed on Linux and macOS
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
       - name: Create .env file with secrets
-        env:
-          # This safely maps the repository secret to an env var for this step
-          NUGET_API_KEY_SECRET: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [ -z "$NUGET_API_KEY_SECRET" ]; then
-            echo "ERROR: The NUGET_API_KEY secret is not set in the repository settings."
-            echo "Please go to Settings > Secrets and variables > Actions to add it."
-            exit 1
-          fi
-          echo "Secret found. Creating .env file."
-          cp public.env .env
-          echo "NUGET_API_KEY=${NUGET_API_KEY_SECRET}" >> .env
+        run: echo "NUGET_API_KEY=${{ secrets.NUGET_API_KEY }}" > .env
+        env: 
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }} 
+      - name: Run Tests
+        run: task test
+      - name: Pack and Push NuGet Package
+        run: task push-nuget
 
+  # Job 3: Prepare the Velopack release, if configured as an application.
+  release-velopack:
+    name: Prepare Velopack Release
+    needs: check-config # This job also depends on the check.
+    if: needs.check-config.outputs.is_app == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
       - name: Create GitHub Release
+        id: create_release
         uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env: 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
         with:
           tag_name: ${{ github.ref_name }}
           release_name: Release ${{ github.ref_name }}
-          body: "Stable release for version ${{ github.ref_name }}."
 
+  # Job 4: Build the application on a matrix.
+  build-velopack:
+    name: Build for ${{ matrix.os }}-${{ matrix.arch }}
+    needs: release-velopack # Depends on the release placeholder being created.
+    # The 'if' condition is inherited from the 'needs' dependency.
+    # If release-velopack is skipped, this job will also be skipped.
+    runs-on: ${{ matrix.runner_os }}
+    strategy:
+      matrix:
+        include:
+          - { runner_os: windows-latest, os: win, arch: x64 }
+          - { runner_os: ubuntu-latest, os: linux, arch: x64 }
+          - { runner_os: macos-latest, os: osx, arch: x64 }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+      - name: Setup Taskfile
+        uses: arduino/setup-task@v2
       - name: Run Tests
         run: task test
+      - name: Build and Pack for ${{ matrix.os }}-${{ matrix.arch }}
+        run: task build-platform-release OS=${{ matrix.os }} ARCH=${{ matrix.arch }} APP_VERSION=${{ github.ref_name }}
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/releases/
 
-      - name: Execute Smart Release
+  # Job 5: Publish all built Velopack artifacts.
+  publish-velopack:
+    name: Publish All Velopack Assets
+    needs: [release-velopack, build-velopack]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+      - name: Upload assets to GitHub Release
         env:
-          # The GITHUB_TOKEN is needed for the `gh` command inside the release task
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Call the single, top-level release task and pass in the
-          # CI-specific variables it needs.
-          task release GITHUB_REF_NAME=${{ github.ref_name }}
+        run: gh release upload ${{ github.ref_name }} ./all-artifacts/*/*/* --clobber
