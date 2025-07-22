@@ -51,9 +51,6 @@ jobs:
         uses: actions/setup-dotnet@v4
       - name: Setup Taskfile
         uses: arduino/setup-task@v2
-      - name: Add .NET tools to PATH
-        if: runner.os != 'Windows' # This step is only needed on Linux and macOS
-        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
       - name: Create .env file with secrets
         run: echo "NUGET_API_KEY=${{ secrets.NUGET_API_KEY }}" > .env
         env: 
@@ -103,6 +100,9 @@ jobs:
         uses: arduino/setup-task@v2
       - name: Run Tests
         run: task test
+      - name: Add .NET tools to PATH
+        if: runner.os != 'Windows' # This step is only needed on Linux and macOS
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
       - name: Build and Pack for ${{ matrix.os }}-${{ matrix.arch }}
         run: task build-platform-release OS=${{ matrix.os }} ARCH=${{ matrix.arch }} APP_VERSION=${{ github.ref_name }}
       - name: Upload Artifacts
