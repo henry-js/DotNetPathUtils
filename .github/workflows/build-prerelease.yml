@@ -4,60 +4,119 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Allows manual triggering
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: Build & Test Pre-release
+  # Job 1: Check the configuration to see if we're a library, an app, or both.
+  check-config:
+    name: Check Project Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      is_library: ${{ steps.check_file.outputs.is_library }}
+      is_app: ${{ steps.check_file.outputs.is_app }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: cat public.env
+        run: cat public.env
+      - name: Read configuration from public.env
+        id: check_file
+        run: |
+          # Initialize variables to false
+          IS_LIBRARY="false"
+          IS_APP="false"
+
+          echo "--- Reading public.env ---"
+          # This robust loop reads the file line by line, ignoring line endings
+          while IFS= read -r line || [[ -n "$line" ]]; do
+            # Use case statement for clean matching
+            case "$line" in
+              # Match lines that start with "PROJECT_TO_PACK=" and have a value after it
+              PROJECT_TO_PACK=*)
+                value="${line#*=}"
+                if [[ -n "$value" ]]; then
+                  echo "Found non-empty PROJECT_TO_PACK"
+                  IS_LIBRARY="true"
+                fi
+                ;;
+              # Match lines that start with "PROJECT_TO_PUBLISH=" and have a value after it
+              PROJECT_TO_PUBLISH=*)
+                value="${line#*=}"
+                if [[ -n "$value" ]]; then
+                  echo "Found non-empty PROJECT_TO_PUBLISH"
+                  IS_APP="true"
+                fi
+                ;;
+            esac
+          done < public.env
+
+          echo "--- Setting outputs ---"
+          echo "is_library=${IS_LIBRARY}" >> $GITHUB_OUTPUT
+          echo "is_app=${IS_APP}" >> $GITHUB_OUTPUT
+          echo "is_library is ${IS_LIBRARY}"
+          echo "is_app is ${IS_APP}"
+
+  # Job 2: Build the NuGet package pre-release, if configured.
+  build-library:
+    name: Build NuGet Pre-release
+    needs: check-config
+    if: needs.check-config.outputs.is_library == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          # Fetches all history and tags, essential for MinVer.
-          fetch-depth: 0
-
+        with: { fetch-depth: 0 }
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
-        with:
-          # Assumes you have a global.json. If not, specify a version.
-          global-json-file: global.json
-
       - name: Setup Taskfile
         uses: arduino/setup-task@v2
-
-      - name: Create .env file for Task
-        run: cp public.env .env
-
-      - name: Restore .NET local tools
-        run: task setup
-
       - name: Get pre-release version
         id: version
         run: echo "version=$(task get-version)" >> $GITHUB_OUTPUT
-
+      - name: Add .NET tools to PATH
+        if: runner.os != 'Windows' # This step is only needed on Linux and macOS
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
       - name: Run Tests
         run: task test
-
-      - name: Package based on project type
-        run: |
-          # Load variables from the env file into the shell
-          source public.env
-
-          if [[ -n "$PROJECT_TO_PACK" ]]; then
-            echo "Project is a library. Packing NuGet package..."
-            task pack:nuget
-          fi
-
-          if [[ -n "$PROJECT_TO_PUBLISH" ]]; then
-            echo "Project is an application. Publishing files..."
-            # Note: We specify the RID for the build here
-            task pack:velopack
-          fi
-
-      - name: Upload Build Artifacts for Inspection
+      - name: Pack NuGet Pre-release Package
+        run: task pack-nuget
+      - name: Upload NuGet Artifact
         uses: actions/upload-artifact@v4
         with:
-          # Name the artifact with the version for easy identification
-          name: dist-${{ steps.version.outputs.version }}
-          path: dist/
+          name: nuget-artifact-${{ steps.version.outputs.version }}
+          path: dist/nuget/
+
+  # Job 3: Build the application on a matrix, if configured.
+  build-application:
+    name: Build App for ${{ matrix.os }}-${{ matrix.arch }}
+    needs: check-config
+    if: needs.check-config.outputs.is_app == 'true'
+    runs-on: ${{ matrix.runner_os }}
+    strategy:
+      fail-fast: false # Allows all platform builds to finish even if one fails
+      matrix:
+        include:
+          - { runner_os: windows-latest, os: win, arch: x64 }
+          - { runner_os: ubuntu-latest, os: linux, arch: x64 }
+          - { runner_os: macos-latest, os: osx, arch: x64 }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+      - name: Setup Taskfile
+        uses: arduino/setup-task@v2
+      - name: Get pre-release version
+        id: version
+        run: echo "version=$(task get-version)" >> $GITHUB_OUTPUT
+      - name: Run Tests
+        run: task test
+      - name: Build and Pack Pre-release for ${{ matrix.os }}-${{ matrix.arch }}
+        # This now correctly calls your CI-specific task.
+        run: task build-platform-release OS=${{ matrix.os }} ARCH=${{ matrix.arch }} APP_VERSION=${{ steps.version.outputs.version }}
+      - name: Upload Application Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-artifact-${{ matrix.os }}-${{ matrix.arch }}-${{ steps.version.outputs.version }}
+          path: dist/releases/

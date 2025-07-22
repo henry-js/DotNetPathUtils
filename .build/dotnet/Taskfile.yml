@@ -45,10 +45,9 @@ tasks:
       - echo "Publishing {{.PROJECT_TO_PUBLISH}} for {{.OS}}/{{.ARCH}} to {{.PUBLISH_DIR}}"
       - dotnet publish "src/{{.PROJECT_TO_PUBLISH}}" -c {{.CONFIGURATION}} -r {{.RID}} -o "{{.PUBLISH_DIR}}"
     preconditions:
-      - sh: 'test -n "{{.PROJECT_TO_PUBLISH}}"'
-        msg: "Cannot publish: PROJECT_TO_PUBLISH variable is not set."
-      - sh: 'test -n "{{.RID}}"'
-        msg: "Cannot publish: RID (Runtime Identifier) variable is not set."
+      - '{{ ne .OS "" }}'
+      - '{{ ne .ARCH "" }}'
+      - '{{ ne .PROJECT_TO_PUBLISH "" }}'
 
   # This task is specifically for creating a NuGet package from a library
   pack-nuget:
