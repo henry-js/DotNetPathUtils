@@ -56,13 +56,14 @@ tasks:
 
   push-nuget:
     desc: "Pushes the NuGet package to a feed"
+    dir: "{{.NUGET_OUTPUT_DIR}}"
     # This task requires these variables to be set in the environment
     preconditions:
       - '{{ ne .NUGET_SOURCE_URL "" }}'
       - msg: "NUGET_SOURCE_URL is not set in your .env/public.env file."
     cmds:
       - >
-        dotnet nuget push "{{.NUGET_OUTPUT_DIR}}/*.nupkg"
+        dotnet nuget push "*.nupkg"
         -k {{.NUGET_API_KEY}}
         -s {{.NUGET_SOURCE_URL}}
         --skip-duplicate
