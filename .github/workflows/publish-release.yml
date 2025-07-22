@@ -14,7 +14,6 @@ jobs:
     name: Check Project Configuration
     runs-on: ubuntu-latest
     outputs:
-      # These outputs will be available to other jobs via the 'needs' context.
       is_library: ${{ steps.check_file.outputs.is_library }}
       is_app: ${{ steps.check_file.outputs.is_app }}
     steps:
@@ -23,19 +22,43 @@ jobs:
       - name: Read configuration from public.env
         id: check_file
         run: |
-          # Check for PROJECT_TO_PACK and set the first output
-          if grep -q "PROJECT_TO_PACK=.+" public.env; then
-            echo "is_library=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_library=false" >> $GITHUB_OUTPUT
-          fi
+          # Initialize variables to a known default state.
+          IS_LIBRARY="false"
+          IS_APP="false"
 
-          # Check for PROJECT_TO_PUBLISH and set the second output
-          if grep -q "PROJECT_TO_PUBLISH=.+" public.env; then
-            echo "is_app=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_app=false" >> $GITHUB_OUTPUT
-          fi
+          echo "--- Reading public.env ---"
+          # This robust loop reads the file line by line, ignoring line endings.
+          while IFS= read -r line || [[ -n "$line" ]]; do
+            # Use case statement for clean, exact matching.
+            case "$line" in
+              # Match lines that start with "PROJECT_TO_PACK="
+              PROJECT_TO_PACK=*)
+                # Get the value after the '='
+                value="${line#*=}"
+                # Check if the value is not an empty string.
+                if [[ -n "$value" ]]; then
+                  echo "Found non-empty PROJECT_TO_PACK"
+                  IS_LIBRARY="true"
+                fi
+                ;;
+              # Match lines that start with "PROJECT_TO_PUBLISH="
+              PROJECT_TO_PUBLISH=*)
+                value="${line#*=}"
+                if [[ -n "$value" ]]; then
+                  echo "Found non-empty PROJECT_TO_PUBLISH"
+                  IS_APP="true"
+                fi
+                ;;
+            esac
+          done < public.env
+
+          echo "--- Setting outputs ---"
+          echo "is_library=${IS_LIBRARY}" >> $GITHUB_OUTPUT
+          echo "is_app=${IS_APP}" >> $GITHUB_OUTPUT
+          
+          # Add extra logging for easy debugging in the Actions UI
+          echo "is_library is ${IS_LIBRARY}"
+          echo "is_app is ${IS_APP}"
 
   # Job 2: Publish NuGet package, if configured as a library.
   release-nuget:
