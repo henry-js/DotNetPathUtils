@@ -9,7 +9,6 @@ permissions:
   contents: write
 
 jobs:
-  # Job 1: Check the configuration and produce outputs for other jobs.
   check-config:
     name: Check Project Configuration
     runs-on: ubuntu-latest
@@ -60,11 +59,9 @@ jobs:
           echo "is_library is ${IS_LIBRARY}"
           echo "is_app is ${IS_APP}"
 
-  # Job 2: Publish NuGet package, if configured as a library.
   release-nuget:
     name: Publish NuGet Package
-    needs: check-config # This job depends on the check finishing first.
-    # This 'if' condition now correctly uses the 'needs' context.
+    needs: check-config
     if: needs.check-config.outputs.is_library == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -83,10 +80,9 @@ jobs:
       - name: Pack and Push NuGet Package
         run: task push-nuget
 
-  # Job 3: Prepare the Velopack release, if configured as an application.
   release-velopack:
     name: Prepare Velopack Release
-    needs: check-config # This job also depends on the check.
+    needs: check-config
     if: needs.check-config.outputs.is_app == 'true'
     runs-on: ubuntu-latest
     outputs:
@@ -123,14 +119,44 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Add .NET tools to PATH
-        if: runner.os != 'Windows' # This step is only needed on Linux and macOS
+        if: runner.os != 'Windows'
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
       - name: Run Tests
         run: task test
       - name: Build and Pack for ${{ matrix.os }}-${{ matrix.arch }}
         run: task build-platform-release OS=${{ matrix.os }} ARCH=${{ matrix.arch }} APP_VERSION=${{ github.ref_name }}
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-assets-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/releases/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          RID="${{ matrix.os }}-${{ matrix.arch }}"
+          SEARCH_PATH="./dist/releases/$RID"
+          echo "Searching for release asset in: $SEARCH_PATH"
+
+          # Use find to build a list of all files we want to upload.
+          # The -o flag means "OR".
+          if [[ "${{ matrix.os }}" == "win" ]]; then
+            # For Windows, find the -Setup.exe AND the -Portable.zip
+            FILES_TO_UPLOAD=$(find "$SEARCH_PATH" \( -name "*-Setup.exe" -o -name "*-Portable.zip" \))
+          elif [[ "${{ matrix.os }}" == "linux" ]]; then
+            # For Linux, find the .AppImage AND the -Portable.zip
+            FILES_TO_UPLOAD=$(find "$SEARCH_PATH" \( -name "*.AppImage" -o -name "*-Portable.zip" \))
+          elif [[ "${{ matrix.os }}" == "osx" ]]; then
+            # For macOS, find ALL .zip files (which includes the main app and portable)
+            FILES_TO_UPLOAD=$(find "$SEARCH_PATH" -name "*.zip")
+          fi
+
+          # Check if we found any files before trying to upload.
+          if [[ -z "$FILES_TO_UPLOAD" ]]; then
+            echo "::error::Could not find any release assets to upload in $SEARCH_PATH"
+            exit 1
+          fi
+
+          echo "--- Found assets to upload ---"
+          echo "$FILES_TO_UPLOAD"
+          echo "------------------------------"
+
+          # Use xargs to pass the list of files to the gh command.
+          echo "$FILES_TO_UPLOAD" | xargs gh release upload ${{ github.ref_name }} --clobber
+
