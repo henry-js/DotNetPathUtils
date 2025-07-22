@@ -90,7 +90,22 @@ jobs:
         if: runner.os != 'Windows'
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
       - name: Get pre-release version and set ENV
-        run: echo "APP_VERSION=$(task get-version)" >> $GITHUB_ENV
+        id: version # Keep the id for the artifact name
+        shell: bash # Use bash for consistency on all runners
+        run: |
+          # 1. Capture the output
+          VERSION_OUTPUT=$(task get-version)
+
+          # 2. Validate the output
+          if [ -z "$VERSION_OUTPUT" ]; then
+            echo "::error::'task get-version' failed or produced an empty string."
+            exit 1
+          fi
+
+          # 3. If validation passes, set the environment and output variables
+          echo "Discovered version: ${VERSION_OUTPUT}"
+          echo "APP_VERSION=${VERSION_OUTPUT}" >> $GITHUB_ENV
+          echo "version=${VERSION_OUTPUT}" >> $GITHUB_OUTPUT
       - name: Run Tests
         run: task test
       - name: Build and Pack Pre-release for ${{ matrix.os }}-${{ matrix.arch }}
