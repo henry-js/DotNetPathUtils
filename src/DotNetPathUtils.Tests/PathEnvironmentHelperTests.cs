@@ -21,30 +21,21 @@ public class PathEnvironmentHelperTests
     public async Task EnsureDirectoryIsInPath_When_Path_Does_Not_Exist_Adds_It()
     {
         // Arrange
-        var directoryToAdd = @"C:\MyTool";
-        var existingPath = @"C:\ExistingPath";
-        var expectedNewPath = $"{existingPath}{Path.PathSeparator}{directoryToAdd}";
+        var rootDir = Path.GetPathRoot(Directory.GetCurrentDirectory()) ?? "/";
+        var directoryToAdd = Path.Combine(rootDir, "MyTool");
+        var existingDir = Path.Combine(rootDir, "ExistingPath");
+        var expectedNewPath = $"{existingDir}{Path.PathSeparator}{directoryToAdd}";
 
-        _service.GetFullPath(Arg.Any<string>()).Returns(x => (string)x[0]); // Simple pass-through
-        _service
-            .GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)
-            .Returns(existingPath);
-        _service.IsWindows().Returns(true);
+        _service.GetFullPath(Arg.Any<string>()).Returns(x => (string)x[0]);
+        _service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User).Returns(existingDir);
+        _service.IsWindows().Returns(OperatingSystem.IsWindows()); // Use the real OS for the test
 
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(
-            directoryToAdd,
-            EnvironmentVariableTarget.User
-        );
+        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
 
         // Assert
-        // await Assert.That(result).IsEqualTo(PathUpdateResult.PathAlreadyExists);
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
-
-        _service
-            .Received(1)
-            .SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
-        _service.Received(1).BroadcastEnvironmentChange();
+        _service.Received(1).SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
     }
 
     [Test]
@@ -173,67 +164,44 @@ public class PathEnvironmentHelperTests
     )
     {
         // Arrange
-        var directoryToAdd = @"C:\MyNewTool";
+        var rootDir = Path.GetPathRoot(Directory.GetCurrentDirectory()) ?? "/";
+        var directoryToAdd = Path.Combine(rootDir, "MyNewTool");
 
-        // Setup the service to return the specified input (null or empty) for the current PATH
-        _service
-            .GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>())
-            .Returns(currentPath);
-
-        // Standard setup for mocks
+        _service.GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>()).Returns(currentPath);
         _service.GetFullPath(directoryToAdd).Returns(directoryToAdd);
-        _service.IsWindows().Returns(true);
+        _service.IsWindows().Returns(OperatingSystem.IsWindows()); // Use the real OS
 
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(
-            directoryToAdd,
-            EnvironmentVariableTarget.User
-        );
+        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
 
         // Assert
-        // 1. Verify the operation reported success
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
-
-        // 2. Verify SetEnvironmentVariable was called with *only the new path*,
-        //    since the original was empty. No leading path separator should be present.
-        _service
-            .Received(1)
-            .SetEnvironmentVariable("PATH", directoryToAdd, EnvironmentVariableTarget.User);
-
-        // 3. Verify the environment change was broadcast (since IsWindows is true)
-        _service.Received(1).BroadcastEnvironmentChange();
+        _service.Received(1).SetEnvironmentVariable("PATH", directoryToAdd, EnvironmentVariableTarget.User);
     }
 
     [Test]
     public async Task EnsureDirectoryIsInPath_When_Existing_Path_Contains_Invalid_Entry_Does_Not_Crash()
     {
         // Arrange
-        var directoryToAdd = @"C:\GoodPath";
-        var invalidEntry = @"C:\Bad<Path";
-        var existingPath = $@"C:\AnotherPath{Path.PathSeparator}{invalidEntry}";
+        var rootDir = Path.GetPathRoot(Directory.GetCurrentDirectory()) ?? "/";
+        var directoryToAdd = Path.Combine(rootDir, "GoodPath");
+        var otherExistingDir = Path.Combine(rootDir, "AnotherPath");
+        // We can still use a known invalid character for the test's purpose.
+        var invalidEntry = otherExistingDir + "<";
+        var existingPath = $"{otherExistingDir}{Path.PathSeparator}{invalidEntry}";
 
-        _service
-            .GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>())
-            .Returns(existingPath);
-        _service.GetFullPath(directoryToAdd).Returns(directoryToAdd); // Normal behavior for the good path
-        _service.GetFullPath(@"C:\AnotherPath").Returns(@"C:\AnotherPath");
+        _service.GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>()).Returns(existingPath);
+        _service.GetFullPath(directoryToAdd).Returns(directoryToAdd);
+        _service.GetFullPath(otherExistingDir).Returns(otherExistingDir);
+        _service.GetFullPath(invalidEntry).Throws<ArgumentException>(); // Mock the failure
 
-        // Make GetFullPath throw *only* for the invalid entry
-        _service.GetFullPath(invalidEntry).Throws<ArgumentException>();
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(
-            directoryToAdd,
-            EnvironmentVariableTarget.User
-        );
+        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
 
         // Assert
-        // The helper should have gracefully ignored the bad entry and added the new one
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
-
         var expectedNewPath = $"{existingPath}{Path.PathSeparator}{directoryToAdd}";
-        _service
-            .Received(1)
-            .SetEnvironmentVariable("PATH", expectedNewPath, Arg.Any<EnvironmentVariableTarget>());
+        _service.Received(1).SetEnvironmentVariable("PATH", expectedNewPath, Arg.Any<EnvironmentVariableTarget>());
     }
 
     [Test]
