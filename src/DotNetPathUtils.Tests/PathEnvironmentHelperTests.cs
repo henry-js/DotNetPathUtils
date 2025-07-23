@@ -57,7 +57,9 @@ public class PathEnvironmentHelperTests
 
         // 2. Setup mocks
         _service.GetFullPath(Arg.Any<string>()).Returns(x => (string)x[0]);
-        _service.GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>()).Returns(existingPath);
+        _service
+            .GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>())
+            .Returns(existingPath);
 
         // Act
         // 3. THIS IS THE FIX: Ensure we are calling the correct method.
