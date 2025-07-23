@@ -33,6 +33,9 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check Environment Variables
+        run: 'echo "HOME variable is: [$HOME]" && echo "XDG_CONFIG_HOME is: [$XDG_CONFIG_HOME]"'
+
       - name: Run Linter
         run: task lint
 

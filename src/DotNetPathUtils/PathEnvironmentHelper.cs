@@ -18,10 +18,11 @@ public class PathEnvironmentHelper
     }
 
     public PathUpdateResult EnsureApplicationXdgConfigDirectoryIsInPath(
-        EnvironmentVariableTarget target = EnvironmentVariableTarget.User
+        EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
+        string? appName = null
     )
     {
-        string? appName = _service.GetApplicationName();
+        appName ??= _service.GetApplicationName();
         if (string.IsNullOrWhiteSpace(appName))
             return PathUpdateResult.Error;
 
@@ -30,7 +31,6 @@ public class PathEnvironmentHelper
             return PathUpdateResult.Error;
 
         string appConfigPath = Path.Combine(configHome, appName);
-        _service.CreateDirectory(appConfigPath);
 
         return EnsureDirectoryIsInPath(appConfigPath, target);
     }
@@ -42,6 +42,16 @@ public class PathEnvironmentHelper
     {
         if (string.IsNullOrWhiteSpace(directoryPath))
             throw new ArgumentNullException(nameof(directoryPath));
+
+        try
+        {
+            _service.CreateDirectory(directoryPath);
+        }
+        catch (Exception ex)
+        {
+            return PathUpdateResult.Error;
+        }
+
         if (
             target == EnvironmentVariableTarget.Process
             && _pathVariableName.Equals("PATH", StringComparison.OrdinalIgnoreCase)
