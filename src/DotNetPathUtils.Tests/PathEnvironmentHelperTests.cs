@@ -27,15 +27,22 @@ public class PathEnvironmentHelperTests
         var expectedNewPath = $"{existingDir}{Path.PathSeparator}{directoryToAdd}";
 
         _service.GetFullPath(Arg.Any<string>()).Returns(x => (string)x[0]);
-        _service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User).Returns(existingDir);
+        _service
+            .GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)
+            .Returns(existingDir);
         _service.IsWindows().Returns(OperatingSystem.IsWindows()); // Use the real OS for the test
 
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
+        var result = _helper.EnsureDirectoryIsInPath(
+            directoryToAdd,
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
-        _service.Received(1).SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
+        _service
+            .Received(1)
+            .SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
     }
 
     [Test]
@@ -167,16 +174,23 @@ public class PathEnvironmentHelperTests
         var rootDir = Path.GetPathRoot(Directory.GetCurrentDirectory()) ?? "/";
         var directoryToAdd = Path.Combine(rootDir, "MyNewTool");
 
-        _service.GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>()).Returns(currentPath);
+        _service
+            .GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>())
+            .Returns(currentPath);
         _service.GetFullPath(directoryToAdd).Returns(directoryToAdd);
         _service.IsWindows().Returns(OperatingSystem.IsWindows()); // Use the real OS
 
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
+        var result = _helper.EnsureDirectoryIsInPath(
+            directoryToAdd,
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
-        _service.Received(1).SetEnvironmentVariable("PATH", directoryToAdd, EnvironmentVariableTarget.User);
+        _service
+            .Received(1)
+            .SetEnvironmentVariable("PATH", directoryToAdd, EnvironmentVariableTarget.User);
     }
 
     [Test]
@@ -190,18 +204,25 @@ public class PathEnvironmentHelperTests
         var invalidEntry = otherExistingDir + "<";
         var existingPath = $"{otherExistingDir}{Path.PathSeparator}{invalidEntry}";
 
-        _service.GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>()).Returns(existingPath);
+        _service
+            .GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>())
+            .Returns(existingPath);
         _service.GetFullPath(directoryToAdd).Returns(directoryToAdd);
         _service.GetFullPath(otherExistingDir).Returns(otherExistingDir);
         _service.GetFullPath(invalidEntry).Throws<ArgumentException>(); // Mock the failure
 
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
+        var result = _helper.EnsureDirectoryIsInPath(
+            directoryToAdd,
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
         var expectedNewPath = $"{existingPath}{Path.PathSeparator}{directoryToAdd}";
-        _service.Received(1).SetEnvironmentVariable("PATH", expectedNewPath, Arg.Any<EnvironmentVariableTarget>());
+        _service
+            .Received(1)
+            .SetEnvironmentVariable("PATH", expectedNewPath, Arg.Any<EnvironmentVariableTarget>());
     }
 
     [Test]
