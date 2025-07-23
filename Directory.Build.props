@@ -7,7 +7,6 @@
     <Authors>henry-js</Authors>
     <Company>henry-js</Company>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="MinVer" Version="6.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

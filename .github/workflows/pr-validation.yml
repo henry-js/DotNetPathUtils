@@ -1,0 +1,40 @@
+name: Pull Request Validation
+
+on:
+
+  pull_request:
+    branches:
+      - 'main'
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    name: Build & Test PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Add .NET tools to PATH
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
+      - name: Setup Taskfile
+        uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Linter
+        run: task lint
+
+      - name: Run Tests
+        run: task test

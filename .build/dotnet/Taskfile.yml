@@ -31,6 +31,15 @@ tasks:
     cmds:
       - dotnet test "{{.SOLUTION_FILE}}" -c {{.CONFIGURATION}} --no-build -tl:off
 
+  lint:
+    desc: "Runs the linter on the solution"
+    cmds:
+      - dotnet csharpier check .
+  format:
+    desc: "Formats the codebase using CSharpier"
+    cmds:
+      - dotnet csharpier format .
+
   # This task is specifically for publishing a runnable application's files
   publish-app:
     desc: "Publishes a runnable application to a directory"

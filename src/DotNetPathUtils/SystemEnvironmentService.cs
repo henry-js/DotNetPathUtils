@@ -9,8 +9,11 @@ public class SystemEnvironmentService : IEnvironmentService
     public string? GetEnvironmentVariable(string variable, EnvironmentVariableTarget target) =>
         Environment.GetEnvironmentVariable(variable, target);
 
-    public void SetEnvironmentVariable(string variable, string? value, EnvironmentVariableTarget target) =>
-        Environment.SetEnvironmentVariable(variable, value, target);
+    public void SetEnvironmentVariable(
+        string variable,
+        string? value,
+        EnvironmentVariableTarget target
+    ) => Environment.SetEnvironmentVariable(variable, value, target);
 
     public string GetFullPath(string path) => Path.GetFullPath(path);
 
@@ -24,7 +27,8 @@ public class SystemEnvironmentService : IEnvironmentService
 
     public void BroadcastEnvironmentChange()
     {
-        if (!IsWindows()) return;
+        if (!IsWindows())
+            return;
 
         try
         {
@@ -36,12 +40,15 @@ public class SystemEnvironmentService : IEnvironmentService
                 "Environment",
                 SMTO_ABORTIFHUNG | SMTO_NOTIMEOUTIFNOTHUNG,
                 5000,
-                out _);
+                out _
+            );
         }
         catch (Exception ex)
         {
             // It's acceptable for a service to log a warning for a non-critical failure.
-            Console.Error.WriteLine($"Warning: Failed to broadcast environment variable change. A restart or re-login might be needed. Error: {ex.Message}");
+            Console.Error.WriteLine(
+                $"Warning: Failed to broadcast environment variable change. A restart or re-login might be needed. Error: {ex.Message}"
+            );
         }
     }
 
@@ -60,6 +67,7 @@ public class SystemEnvironmentService : IEnvironmentService
         string lParam,
         uint fuFlags,
         uint uTimeout,
-        out UIntPtr lpdwResult);
+        out UIntPtr lpdwResult
+    );
     #endregion
 }

@@ -19,7 +19,9 @@ Console.WriteLine($"App name: {service.GetApplicationName()}\n");
 
 Console.WriteLine($"XDG Config Home: {service.GetXdgConfigHome()}\n");
 
-Console.WriteLine($"Path: {service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)}\n");
+Console.WriteLine(
+    $"Path: {service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)}\n"
+);
 
 var envHelper = new PathEnvironmentHelper(service);
 

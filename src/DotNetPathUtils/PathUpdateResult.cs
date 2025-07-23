@@ -5,7 +5,7 @@ public enum PathUpdateResult
     PathAdded,
     PathAlreadyExists,
 
-    Error
+    Error,
 }
 
 public enum PathRemoveResult
@@ -13,5 +13,5 @@ public enum PathRemoveResult
     PathRemoved,
     PathNotFound,
 
-    Error
+    Error,
 }

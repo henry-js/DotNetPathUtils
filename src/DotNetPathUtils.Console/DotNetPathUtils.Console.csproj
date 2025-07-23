@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <AssemblyName>sampleApp</AssemblyName>
     <OutputType>Exe</OutputType>
@@ -9,13 +8,10 @@
     <PublishSingleFile>true</PublishSingleFile>
     <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
   </PropertyGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\DotNetPathUtils\DotNetPathUtils.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Velopack" Version="0.0.1298" />
   </ItemGroup>
-
 </Project>

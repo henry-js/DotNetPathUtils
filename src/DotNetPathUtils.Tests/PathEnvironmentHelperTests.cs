@@ -26,17 +26,24 @@ public class PathEnvironmentHelperTests
         var expectedNewPath = $"{existingPath}{Path.PathSeparator}{directoryToAdd}";
 
         _service.GetFullPath(Arg.Any<string>()).Returns(x => (string)x[0]); // Simple pass-through
-        _service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User).Returns(existingPath);
+        _service
+            .GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)
+            .Returns(existingPath);
         _service.IsWindows().Returns(true);
 
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
+        var result = _helper.EnsureDirectoryIsInPath(
+            directoryToAdd,
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         // await Assert.That(result).IsEqualTo(PathUpdateResult.PathAlreadyExists);
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
 
-        _service.Received(1).SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
+        _service
+            .Received(1)
+            .SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
         _service.Received(1).BroadcastEnvironmentChange();
     }
 
@@ -60,10 +67,15 @@ public class PathEnvironmentHelperTests
         // 3. Make the mock behave more realistically for this test.
         // It should just return the input, as we are providing "normalized" paths already.
         _service.GetFullPath(Arg.Any<string>()).Returns(x => (string)x[0]);
-        _service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User).Returns(existingPath);
+        _service
+            .GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)
+            .Returns(existingPath);
 
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
+        var result = _helper.EnsureDirectoryIsInPath(
+            directoryToAdd,
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAlreadyExists);
@@ -87,28 +99,37 @@ public class PathEnvironmentHelperTests
         _service.IsWindows().Returns(false); // Simulate running on Linux
 
         // Act
-        var result = _helper.EnsureApplicationXdgConfigDirectoryIsInPath(EnvironmentVariableTarget.User);
+        var result = _helper.EnsureApplicationXdgConfigDirectoryIsInPath(
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
 
         _service.Received(1).CreateDirectory(expectedPath);
-        _service.Received(1).SetEnvironmentVariable("PATH", expectedPath, EnvironmentVariableTarget.User);
+        _service
+            .Received(1)
+            .SetEnvironmentVariable("PATH", expectedPath, EnvironmentVariableTarget.User);
     }
 
     [Test]
     public async Task EnsureDirectoryIsInPath_When_Given_Null_Directory_Throws_ArgumentNullException()
     {
         // Act & Assert
-        await Assert.That(() => _helper.EnsureDirectoryIsInPath(null!, EnvironmentVariableTarget.User)).ThrowsExactly<ArgumentNullException>();
+        await Assert
+            .That(() => _helper.EnsureDirectoryIsInPath(null!, EnvironmentVariableTarget.User))
+            .ThrowsExactly<ArgumentNullException>();
     }
 
     [Test]
     public async Task EnsureDirectoryIsInPath_When_Target_Is_Process_Throws_ArgumentException()
     {
         // Act & Assert
-        await Assert.That(() => _helper.EnsureDirectoryIsInPath("some-path", EnvironmentVariableTarget.Process))
-              .ThrowsExactly<ArgumentException>();
+        await Assert
+            .That(() =>
+                _helper.EnsureDirectoryIsInPath("some-path", EnvironmentVariableTarget.Process)
+            )
+            .ThrowsExactly<ArgumentException>();
     }
 
     [Test]
@@ -116,7 +137,9 @@ public class PathEnvironmentHelperTests
     {
         // Arrange
         // 1. Create a platform-agnostic base path.
-        var rootDir = Path.GetPathRoot(Directory.GetCurrentDirectory()) ?? (OperatingSystem.IsWindows() ? @"C:\" : "/");
+        var rootDir =
+            Path.GetPathRoot(Directory.GetCurrentDirectory())
+            ?? (OperatingSystem.IsWindows() ? @"C:\" : "/");
         var directoryWithoutSlash = Path.Combine(rootDir, "MyTool");
 
         // 2. THIS IS THE FIX: Create the version with the correct trailing slash for the current OS.
@@ -125,11 +148,16 @@ public class PathEnvironmentHelperTests
         // 3. Set up the mocks to return these well-defined paths.
         _service.GetFullPath(directoryWithoutSlash).Returns(directoryWithoutSlash);
         _service.GetFullPath(directoryWithSlash).Returns(directoryWithSlash);
-        _service.GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>()).Returns(directoryWithSlash);
+        _service
+            .GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>())
+            .Returns(directoryWithSlash);
 
         // Act
         // We try to add the version WITHOUT the slash.
-        var result = _helper.EnsureDirectoryIsInPath(directoryWithoutSlash, EnvironmentVariableTarget.User);
+        var result = _helper.EnsureDirectoryIsInPath(
+            directoryWithoutSlash,
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         // The code should correctly identify it as a duplicate and do nothing.
@@ -140,20 +168,27 @@ public class PathEnvironmentHelperTests
     [Test]
     [Arguments(null)]
     [Arguments("")]
-    public async Task EnsureDirectoryIsInPath_When_Current_Path_Is_Null_Or_Empty_Adds_Path_Correctly(string? currentPath)
+    public async Task EnsureDirectoryIsInPath_When_Current_Path_Is_Null_Or_Empty_Adds_Path_Correctly(
+        string? currentPath
+    )
     {
         // Arrange
         var directoryToAdd = @"C:\MyNewTool";
 
         // Setup the service to return the specified input (null or empty) for the current PATH
-        _service.GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>()).Returns(currentPath);
+        _service
+            .GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>())
+            .Returns(currentPath);
 
         // Standard setup for mocks
         _service.GetFullPath(directoryToAdd).Returns(directoryToAdd);
         _service.IsWindows().Returns(true);
 
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
+        var result = _helper.EnsureDirectoryIsInPath(
+            directoryToAdd,
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         // 1. Verify the operation reported success
@@ -161,11 +196,9 @@ public class PathEnvironmentHelperTests
 
         // 2. Verify SetEnvironmentVariable was called with *only the new path*,
         //    since the original was empty. No leading path separator should be present.
-        _service.Received(1).SetEnvironmentVariable(
-            "PATH",
-            directoryToAdd,
-            EnvironmentVariableTarget.User
-        );
+        _service
+            .Received(1)
+            .SetEnvironmentVariable("PATH", directoryToAdd, EnvironmentVariableTarget.User);
 
         // 3. Verify the environment change was broadcast (since IsWindows is true)
         _service.Received(1).BroadcastEnvironmentChange();
@@ -179,21 +212,28 @@ public class PathEnvironmentHelperTests
         var invalidEntry = @"C:\Bad<Path";
         var existingPath = $@"C:\AnotherPath{Path.PathSeparator}{invalidEntry}";
 
-        _service.GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>()).Returns(existingPath);
+        _service
+            .GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>())
+            .Returns(existingPath);
         _service.GetFullPath(directoryToAdd).Returns(directoryToAdd); // Normal behavior for the good path
         _service.GetFullPath(@"C:\AnotherPath").Returns(@"C:\AnotherPath");
 
         // Make GetFullPath throw *only* for the invalid entry
         _service.GetFullPath(invalidEntry).Throws<ArgumentException>();
         // Act
-        var result = _helper.EnsureDirectoryIsInPath(directoryToAdd, EnvironmentVariableTarget.User);
+        var result = _helper.EnsureDirectoryIsInPath(
+            directoryToAdd,
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         // The helper should have gracefully ignored the bad entry and added the new one
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
 
         var expectedNewPath = $"{existingPath}{Path.PathSeparator}{directoryToAdd}";
-        _service.Received(1).SetEnvironmentVariable("PATH", expectedNewPath, Arg.Any<EnvironmentVariableTarget>());
+        _service
+            .Received(1)
+            .SetEnvironmentVariable("PATH", expectedNewPath, Arg.Any<EnvironmentVariableTarget>());
     }
 
     [Test]
@@ -204,15 +244,29 @@ public class PathEnvironmentHelperTests
         _service.GetFullPath(Arg.Any<string>()).Returns(x => (string)x[0]);
 
         var originalException = new SecurityException("Access Denied.");
-        _service.When(s => s.SetEnvironmentVariable(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<EnvironmentVariableTarget>()))
-                .Throw(originalException);
+        _service
+            .When(s =>
+                s.SetEnvironmentVariable(
+                    Arg.Any<string>(),
+                    Arg.Any<string>(),
+                    Arg.Any<EnvironmentVariableTarget>()
+                )
+            )
+            .Throw(originalException);
 
         // Act & Assert
-        var ex = await Assert.That(() => _helper.EnsureDirectoryIsInPath("any_path", EnvironmentVariableTarget.Machine))
-                       .ThrowsExactly<SecurityException>();
+        var ex = await Assert
+            .That(() =>
+                _helper.EnsureDirectoryIsInPath("any_path", EnvironmentVariableTarget.Machine)
+            )
+            .ThrowsExactly<SecurityException>();
 
         // Verify the message and that the original exception is wrapped
-        await Assert.That(ex!.Message).IsEqualTo("Failed to set Machine PATH variable. Administrator privileges may be required.");
+        await Assert
+            .That(ex!.Message)
+            .IsEqualTo(
+                "Failed to set Machine PATH variable. Administrator privileges may be required."
+            );
         await Assert.That(ex.InnerException).IsEquivalentTo(originalException);
     }
 
@@ -225,20 +279,27 @@ public class PathEnvironmentHelperTests
         var appName = "MyCoolApp";
         var xdgHome = "/home/user/.config";
         var pathToRemove = Path.Combine(xdgHome, appName);
-        var existingPath = $"/usr/bin{Path.PathSeparator}{pathToRemove}{Path.PathSeparator}/usr/local/bin";
+        var existingPath =
+            $"/usr/bin{Path.PathSeparator}{pathToRemove}{Path.PathSeparator}/usr/local/bin";
         var expectedNewPath = $"/usr/bin{Path.PathSeparator}/usr/local/bin";
 
         _service.GetApplicationName().Returns(appName);
         _service.GetXdgConfigHome().Returns(xdgHome);
         _service.GetFullPath(pathToRemove).Returns(pathToRemove); // Keep it simple for the test
-        _service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User).Returns(existingPath);
+        _service
+            .GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)
+            .Returns(existingPath);
 
         // Act
-        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath(EnvironmentVariableTarget.User);
+        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath(
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         await Assert.That(result).IsEqualTo(PathRemoveResult.PathRemoved);
-        _service.Received(1).SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
+        _service
+            .Received(1)
+            .SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
     }
 
     [Test]
@@ -253,10 +314,14 @@ public class PathEnvironmentHelperTests
         _service.GetApplicationName().Returns(appName);
         _service.GetXdgConfigHome().Returns(xdgHome);
         _service.GetFullPath(pathThatShouldBeRemoved).Returns(pathThatShouldBeRemoved);
-        _service.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User).Returns(existingPath);
+        _service
+            .GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)
+            .Returns(existingPath);
 
         // Act
-        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath(EnvironmentVariableTarget.User);
+        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath(
+            EnvironmentVariableTarget.User
+        );
 
         // Assert
         await Assert.That(result).IsEqualTo(PathRemoveResult.PathNotFound);

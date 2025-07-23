@@ -8,6 +8,13 @@
         "minver"
       ],
       "rollForward": false
+    },
+    "csharpier": {
+      "version": "1.0.3",
+      "commands": [
+        "csharpier"
+      ],
+      "rollForward": false
     }
   }
 }
