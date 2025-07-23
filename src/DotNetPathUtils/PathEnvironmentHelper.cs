@@ -31,7 +31,6 @@ public class PathEnvironmentHelper
             return PathUpdateResult.Error;
 
         string appConfigPath = Path.Combine(configHome, appName);
-        _service.CreateDirectory(appConfigPath);
 
         return EnsureDirectoryIsInPath(appConfigPath, target);
     }
@@ -46,7 +45,7 @@ public class PathEnvironmentHelper
 
         try
         {
-            Directory.CreateDirectory(directoryPath);
+            _service.CreateDirectory(directoryPath);
         }
         catch (Exception ex)
         {
