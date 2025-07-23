@@ -17,14 +17,23 @@ includes:
 
 tasks:
   default:
+    desc: "Runs the default build task"
     cmds: [{ task: build }]
-
   clean:
+    desc: "Cleans the solution"
     cmds: [{ task: dotnet:clean }]
   build:
+    desc: "Builds the solution in Release configuration"
     cmds: [{ task: dotnet:build }]
   test:
+    desc: "Runs all tests in the solution"
     cmds: [{ task: dotnet:test }]
+  lint:
+    desc: "Runs the linter at the root of the project"
+    cmds: [{ task: dotnet:lint }]
+  format:
+    desc: "Formats the codebase using CSharpier"
+    cmds: [{ task: dotnet:format }]
   setup:
     silent: true
     desc: "Restores local .NET tools defined in the manifest"
