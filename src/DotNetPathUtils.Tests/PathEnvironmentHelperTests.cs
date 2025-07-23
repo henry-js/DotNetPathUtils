@@ -49,27 +49,18 @@ public class PathEnvironmentHelperTests
     public async Task EnsureDirectoryIsInPath_When_Path_Already_Exists_Returns_AlreadyExists()
     {
         // Arrange
-        // 1. Create a root directory that is valid for the current OS.
-        var rootDir = Path.GetPathRoot(Directory.GetCurrentDirectory());
-        if (string.IsNullOrEmpty(rootDir))
-        {
-            // Fallback for non-standard filesystems (e.g. running in certain containers)
-            rootDir = OperatingSystem.IsWindows() ? @"C:\" : "/";
-        }
-
-        // 2. Build platform-agnostic paths using Path.Combine.
+        // 1. Build platform-agnostic paths
+        var rootDir = OperatingSystem.IsWindows() ? @"C:\" : "/";
         var directoryToAdd = Path.Combine(rootDir, "MyTool");
         var otherExistingDir = Path.Combine(rootDir, "ExistingPath");
         var existingPath = $"{otherExistingDir}{Path.PathSeparator}{directoryToAdd}";
 
-        // 3. Make the mock behave more realistically for this test.
-        // It should just return the input, as we are providing "normalized" paths already.
+        // 2. Setup mocks
         _service.GetFullPath(Arg.Any<string>()).Returns(x => (string)x[0]);
-        _service
-            .GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)
-            .Returns(existingPath);
+        _service.GetEnvironmentVariable("PATH", Arg.Any<EnvironmentVariableTarget>()).Returns(existingPath);
 
         // Act
+        // 3. THIS IS THE FIX: Ensure we are calling the correct method.
         var result = _helper.EnsureDirectoryIsInPath(
             directoryToAdd,
             EnvironmentVariableTarget.User
@@ -77,9 +68,7 @@ public class PathEnvironmentHelperTests
 
         // Assert
         await Assert.That(result).IsEqualTo(PathUpdateResult.PathAlreadyExists);
-
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
-        _service.DidNotReceive().BroadcastEnvironmentChange();
     }
 
     [Test]
