@@ -257,7 +257,7 @@ public class PathEnvironmentHelperTests
     public async Task RemoveApplicationXdgConfigDirectoryFromPath_When_Path_Exists_Removes_It()
     {
         // Arrange
-        var appName = "MyCoolApp";
+        var appName = ".myCoolApp";
         var xdgHome = "/home/user/.config";
         var pathToRemove = Path.Combine(xdgHome, appName);
         var existingPath =
@@ -287,7 +287,7 @@ public class PathEnvironmentHelperTests
     public async Task RemoveApplicationXdgConfigDirectoryFromPath_When_Path_Does_Not_Exist_Returns_NotFound()
     {
         // Arrange
-        var appName = "MyCoolApp";
+        var appName = ".myCoolApp";
         var xdgHome = "/home/user/.config";
         var pathThatShouldBeRemoved = Path.Combine(xdgHome, appName);
         var existingPath = "/usr/bin:/usr/local/bin"; // Path does not contain the target
