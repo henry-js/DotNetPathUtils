@@ -1,4 +1,5 @@
 ﻿using System.Security;
+using Microsoft.Extensions.Logging;
 
 namespace DotNetPathUtils;
 
@@ -6,31 +7,52 @@ public class PathEnvironmentHelper
 {
     private readonly IEnvironmentService _service;
     private readonly string _pathVariableName;
+    private readonly ILogger<PathEnvironmentHelper>? logger;
 
-    public PathEnvironmentHelper(IEnvironmentService service)
-        : this(service, "PATH") { }
+    public PathEnvironmentHelper(
+        IEnvironmentService service,
+        ILogger<PathEnvironmentHelper>? logger = null
+    )
+        : this(service, "PATH")
+    {
+        this.logger = logger;
+    }
 
     internal PathEnvironmentHelper(IEnvironmentService service, string pathVariableName)
     {
-        _service = service ?? throw new ArgumentNullException(nameof(service));
-        _pathVariableName =
-            pathVariableName ?? throw new ArgumentNullException(nameof(pathVariableName));
+        if (string.IsNullOrWhiteSpace(pathVariableName))
+            throw new ArgumentNullException(nameof(pathVariableName));
+        {
+            _service = service ?? throw new ArgumentNullException(nameof(service));
+            _pathVariableName =
+                pathVariableName ?? throw new ArgumentNullException(nameof(pathVariableName));
+        }
     }
 
     public PathUpdateResult EnsureApplicationXdgConfigDirectoryIsInPath(
         EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
-        string? appName = null
+        string? appName = null,
+        PathUtilsOptions? options = null
     )
     {
-        appName ??= _service.GetApplicationName();
-        if (string.IsNullOrWhiteSpace(appName))
+        string name = appName ?? _service.GetApplicationName();
+        if (string.IsNullOrWhiteSpace(name))
             return PathUpdateResult.Error;
 
+        options ??= PathUtilsOptions.Default;
+
+        if (options.DirectoryNameCase == DirectoryNameCase.PascalCase)
+        {
+            name = name.ToPascalCase();
+        }
+
+        if (options.PrefixWithPeriod && !name!.StartsWith("."))
+            name = '.' + name;
         string configHome = _service.GetXdgConfigHome();
         if (string.IsNullOrWhiteSpace(configHome))
             return PathUpdateResult.Error;
 
-        string appConfigPath = Path.Combine(configHome, appName);
+        string appConfigPath = Path.Combine(configHome, name);
 
         return EnsureDirectoryIsInPath(appConfigPath, target);
     }
@@ -49,6 +71,7 @@ public class PathEnvironmentHelper
         }
         catch (Exception ex)
         {
+            logger?.DirectoryCreationFailed(directoryPath, ex.Message);
             return PathUpdateResult.Error;
         }
 
@@ -80,6 +103,7 @@ public class PathEnvironmentHelper
                 string normalizedExisting = _service
                     .GetFullPath(p)
                     .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
                 return normalizedExisting.Equals(
                     normalizedDirectoryToAdd,
                     StringComparison.OrdinalIgnoreCase
@@ -121,7 +145,6 @@ public class PathEnvironmentHelper
         EnvironmentVariableTarget target = EnvironmentVariableTarget.User
     )
     {
-        // This method should also be updated to use the generic RemoveDirectoryFromPath
         string? appName = _service.GetApplicationName();
         if (string.IsNullOrWhiteSpace(appName))
             return PathRemoveResult.Error;

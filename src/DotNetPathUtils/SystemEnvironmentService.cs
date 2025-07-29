@@ -19,7 +19,11 @@ public class SystemEnvironmentService : IEnvironmentService
 
     public void CreateDirectory(string path) => Directory.CreateDirectory(path);
 
-    public string? GetApplicationName() => Assembly.GetEntryAssembly()?.GetName().Name;
+    public string GetApplicationName() =>
+        Assembly.GetEntryAssembly()?.GetName().Name
+        ?? throw new InvalidOperationException(
+            "Unable to determine application name. Ensure the entry assembly is set correctly."
+        );
 
     public string GetXdgConfigHome() => BaseDirectory.ConfigHome;
 

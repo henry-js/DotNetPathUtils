@@ -6,7 +6,7 @@ public interface IEnvironmentService
     void SetEnvironmentVariable(string variable, string? value, EnvironmentVariableTarget target);
     string GetFullPath(string path);
     void CreateDirectory(string path);
-    string? GetApplicationName();
+    string GetApplicationName();
     string GetXdgConfigHome();
     void BroadcastEnvironmentChange();
     bool IsWindows();
