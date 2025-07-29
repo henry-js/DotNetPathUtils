@@ -7,53 +7,49 @@ public class PathEnvironmentHelper
 {
     private readonly IEnvironmentService _service;
     private readonly string _pathVariableName;
+    private readonly PathUtilsOptions options;
     private readonly ILogger<PathEnvironmentHelper>? logger;
 
     public PathEnvironmentHelper(
         IEnvironmentService service,
+        ILogger<PathEnvironmentHelper>? logger = null,
+        PathUtilsOptions? options = null
+    )
+        : this(service, "PATH", options, logger) { }
+
+    internal PathEnvironmentHelper(
+        IEnvironmentService service,
+        string pathVariableName,
+        PathUtilsOptions? options = null,
         ILogger<PathEnvironmentHelper>? logger = null
     )
-        : this(service, "PATH")
-    {
-        this.logger = logger;
-    }
-
-    internal PathEnvironmentHelper(IEnvironmentService service, string pathVariableName)
     {
         if (string.IsNullOrWhiteSpace(pathVariableName))
             throw new ArgumentNullException(nameof(pathVariableName));
-        {
-            _service = service ?? throw new ArgumentNullException(nameof(service));
-            _pathVariableName =
-                pathVariableName ?? throw new ArgumentNullException(nameof(pathVariableName));
-        }
+
+        _service = service ?? throw new ArgumentNullException(nameof(service));
+        _pathVariableName = pathVariableName;
+        this.options = options ?? PathUtilsOptions.Default;
+        this.logger = logger;
     }
 
     public PathUpdateResult EnsureApplicationXdgConfigDirectoryIsInPath(
         EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
         string? appName = null,
-        PathUtilsOptions? options = null
+        PathUtilsOptions? methodOptions = null // Renamed for clarity
     )
     {
-        string name = appName ?? _service.GetApplicationName();
-        if (string.IsNullOrWhiteSpace(name))
+        var effectiveOptions = methodOptions ?? this.options;
+
+        string formattedName = GetFormattedApplicationName(appName, effectiveOptions);
+        if (string.IsNullOrWhiteSpace(formattedName))
             return PathUpdateResult.Error;
 
-        options ??= PathUtilsOptions.Default;
-
-        if (options.DirectoryNameCase == DirectoryNameCase.CamelCase)
-        {
-            name = name.ToCamelCase();
-        }
-
-        if (options.PrefixWithPeriod && !name!.StartsWith("."))
-            name = '.' + name;
         string configHome = _service.GetXdgConfigHome();
         if (string.IsNullOrWhiteSpace(configHome))
             return PathUpdateResult.Error;
 
-        string appConfigPath = Path.Combine(configHome, name);
-
+        string appConfigPath = Path.Combine(configHome, formattedName);
         return EnsureDirectoryIsInPath(appConfigPath, target);
     }
 
@@ -142,18 +138,22 @@ public class PathEnvironmentHelper
     }
 
     public PathRemoveResult RemoveApplicationXdgConfigDirectoryFromPath(
-        EnvironmentVariableTarget target = EnvironmentVariableTarget.User
+        EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
+        string? appName = null,
+        PathUtilsOptions? methodOptions = null
     )
     {
-        string? appName = _service.GetApplicationName();
-        if (string.IsNullOrWhiteSpace(appName))
+        var effectiveOptions = methodOptions ?? this.options;
+
+        string formattedName = GetFormattedApplicationName(appName, effectiveOptions);
+        if (string.IsNullOrWhiteSpace(formattedName))
             return PathRemoveResult.Error;
 
         string configHome = _service.GetXdgConfigHome();
         if (string.IsNullOrWhiteSpace(configHome))
             return PathRemoveResult.Error;
 
-        string appConfigPath = Path.Combine(configHome, appName);
+        string appConfigPath = Path.Combine(configHome, formattedName);
         return RemoveDirectoryFromPath(appConfigPath, target);
     }
 
@@ -205,5 +205,24 @@ public class PathEnvironmentHelper
             _service.BroadcastEnvironmentChange();
 
         return PathRemoveResult.PathRemoved;
+    }
+
+    private string GetFormattedApplicationName(string? appName, PathUtilsOptions options)
+    {
+        string name = appName ?? _service.GetApplicationName();
+        if (string.IsNullOrWhiteSpace(name))
+            return string.Empty;
+
+        if (options.DirectoryNameCase == DirectoryNameCase.CamelCase)
+        {
+            name = name.ToCamelCase();
+        }
+
+        if (options.PrefixWithPeriod && !name.StartsWith("."))
+        {
+            name = '.' + name;
+        }
+
+        return name;
     }
 }
