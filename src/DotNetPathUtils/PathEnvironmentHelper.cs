@@ -41,9 +41,9 @@ public class PathEnvironmentHelper
 
         options ??= PathUtilsOptions.Default;
 
-        if (options.DirectoryNameCase == DirectoryNameCase.PascalCase)
+        if (options.DirectoryNameCase == DirectoryNameCase.CamelCase)
         {
-            name = name.ToPascalCase();
+            name = name.ToCamelCase();
         }
 
         if (options.PrefixWithPeriod && !name!.StartsWith("."))

@@ -9,5 +9,5 @@ public record PathUtilsOptions
 
 public enum DirectoryNameCase
 {
-    PascalCase,
+    CamelCase,
 }

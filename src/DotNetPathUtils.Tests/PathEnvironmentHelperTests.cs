@@ -79,7 +79,7 @@ public class PathEnvironmentHelperTests
         // Arrange
         var appName = "MyCoolApp";
         var xdgHome = "/home/user/.config";
-        var expectedAppName = "." + appName.ToPascalCase();
+        var expectedAppName = "." + appName.ToCamelCase();
         var expectedPath = Path.Combine(xdgHome, expectedAppName);
 
         _service.GetApplicationName().Returns(appName);
