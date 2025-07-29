@@ -1,10 +1,14 @@
 ﻿name: Build Pre-release
 
 on:
-  push:
-    branches:
-      - main
+  # This makes the workflow completely manual.
   workflow_dispatch:
+    # You can optionally add inputs for the person running the workflow.
+    inputs:
+      reason:
+        description: 'Reason for building the pre-release'
+        required: true
+        default: 'Testing release candidate'
 
 jobs:
   check-config:
