@@ -1,11 +1,15 @@
 name: Pull Request Validation
 
 on:
-
   pull_request:
     branches:
       - 'main'
     types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write
 
 jobs:
   validate:
@@ -22,22 +26,37 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Add .NET tools to PATH
-        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-
       - name: Restore .NET tools
         run: dotnet tool restore
 
-      - name: Setup Taskfile
-        uses: arduino/setup-task@v2
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check Environment Variables
-        run: 'echo "HOME variable is: [$HOME]" && echo "XDG_CONFIG_HOME is: [$XDG_CONFIG_HOME]"'
-
-      - name: Run Linter
-        run: task lint
-
       - name: Run Tests
-        run: task test
+        run: dotnet run .build/targets.cs test
+
+      - name: ReportGenerator
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.4.12
+        with:
+          reports: TestResults/coverage.xml
+          targetdir: coveragereport
+          reporttypes: 'Html;MarkdownSummaryGithub;Badges'
+
+      - name: Upload full coverage report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coveragereport/
+
+      - name: Add coverage summary to pull request
+        # This step only runs for pull requests
+        if: github.event_name == 'pull_request'
+        run: |
+          # Use the official GitHub CLI to post a comment
+          # It will find and update its own previous comment, or create a new one
+          gh pr comment ${{ github.event.number }} --body-file coveragereport/SummaryGithub.md
+        env:
+          # The GITHUB_TOKEN is automatically provided by GitHub Actions
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Add coverage summary to job summary
+        # This adds the same markdown report to the GitHub Actions summary page
+        run: cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+        shell: bash
