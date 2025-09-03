@@ -2,17 +2,10 @@
   "version": 1,
   "isRoot": true,
   "tools": {
-    "minver-cli": {
-      "version": "6.0.0",
+    "dotnet-reportgenerator-globaltool": {
+      "version": "5.4.12",
       "commands": [
-        "minver"
-      ],
-      "rollForward": false
-    },
-    "csharpier": {
-      "version": "1.0.3",
-      "commands": [
-        "csharpier"
+        "reportgenerator"
       ],
       "rollForward": false
     }
