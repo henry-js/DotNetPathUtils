@@ -1,4 +1,5 @@
-﻿using System.Security;
+﻿using System.Runtime.InteropServices;
+using System.Security;
 using System.Threading.Tasks;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
@@ -218,7 +219,7 @@ public class PathEnvironmentHelperTests
             .SetEnvironmentVariable("PATH", expectedNewPath, Arg.Any<EnvironmentVariableTarget>());
     }
 
-    [Test]
+    [Test, WindowsOnly]
     public async Task EnsureDirectoryIsInPath_When_Set_Fails_With_SecurityException_Rethrows_With_Custom_Message()
     {
         // Arrange
@@ -340,7 +341,7 @@ public class PathEnvironmentHelperTests
             .StartsWith("The directory path must be a fully rooted, absolute path");
     }
 
-    [Test]
+    [Test, WindowsOnly]
     public async Task EnsureApplicationXdgConfigDirectoryIsInPath_When_AppName_Contains_Invalid_Chars_Throws_ArgumentException()
     {
         // Arrange
@@ -373,5 +374,13 @@ public class PathEnvironmentHelperTests
         await Assert
             .That(ex!.Message)
             .StartsWith("The application name contains invalid characters.");
+    }
+}
+
+public class WindowsOnlyAttribute() : SkipAttribute("This test is only supported on Windows")
+{
+    public override Task<bool> ShouldSkip(TestRegisteredContext context)
+    {
+        return Task.FromResult(!RuntimeInformation.IsOSPlatform(OSPlatform.Windows));
     }
 }
