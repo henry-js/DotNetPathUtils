@@ -1,14 +1,13 @@
 namespace DotNetPathUtils;
 
-public enum PathUpdateResult
+public enum PathUpdateStatus
 {
+    Error,
     PathAdded,
     PathAlreadyExists,
-
-    Error,
 }
 
-public enum PathRemoveResult
+public enum PathRemoveStatus
 {
     PathRemoved,
     PathNotFound,

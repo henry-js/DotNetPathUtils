@@ -62,7 +62,7 @@ namespace OnPath.Net.Tests
             );
 
             // Assert: Part 1 - Check the result and the real environment variable
-            await Assert.That(addResult).IsEqualTo(PathUpdateResult.PathAdded);
+            await Assert.That(addResult.Status).IsEqualTo(PathUpdateStatus.PathAdded);
 
             var currentPath = Environment.GetEnvironmentVariable(
                 TestPathVariableName,
@@ -81,7 +81,7 @@ namespace OnPath.Net.Tests
             );
 
             // Assert: Part 2 - Check the result and the now-empty environment variable
-            await Assert.That(removeResult).IsEqualTo(PathRemoveResult.PathRemoved);
+            await Assert.That(removeResult.Status).IsEqualTo(PathRemoveStatus.PathRemoved);
 
             var finalPath = Environment.GetEnvironmentVariable(
                 TestPathVariableName,

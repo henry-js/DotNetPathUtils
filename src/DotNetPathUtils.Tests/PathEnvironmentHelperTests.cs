@@ -39,7 +39,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAdded);
         _service
             .Received(1)
             .SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
@@ -69,7 +69,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAlreadyExists);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAlreadyExists);
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
     }
 
@@ -95,7 +95,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAdded);
 
         _service.Received(1).CreateDirectory(expectedPath);
         _service
@@ -152,7 +152,7 @@ public class PathEnvironmentHelperTests
 
         // Assert
         // The code should correctly identify it as a duplicate and do nothing.
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAlreadyExists);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAlreadyExists);
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
     }
 
@@ -180,7 +180,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAdded);
         _service
             .Received(1)
             .SetEnvironmentVariable("PATH", directoryToAdd, EnvironmentVariableTarget.User);
@@ -211,7 +211,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAdded);
         var expectedNewPath = $"{existingPath}{Path.PathSeparator}{directoryToAdd}";
         _service
             .Received(1)
@@ -278,7 +278,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathRemoveResult.PathRemoved);
+        await Assert.That(result.Status).IsEqualTo(PathRemoveStatus.PathRemoved);
         _service
             .Received(1)
             .SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
@@ -306,7 +306,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathRemoveResult.PathNotFound);
+        await Assert.That(result.Status).IsEqualTo(PathRemoveStatus.PathNotFound);
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
     }
 
@@ -320,7 +320,7 @@ public class PathEnvironmentHelperTests
         var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath();
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathRemoveResult.Error);
+        await Assert.That(result.Status).IsEqualTo(PathRemoveStatus.Error);
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
     }
 }
