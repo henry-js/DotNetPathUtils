@@ -239,7 +239,7 @@ public class PathEnvironmentHelperTests
         // Act & Assert
         var ex = await Assert
             .That(() =>
-                _helper.EnsureDirectoryIsInPath("any_path", EnvironmentVariableTarget.Machine)
+                _helper.EnsureDirectoryIsInPath("C:\\anypath", EnvironmentVariableTarget.Machine)
             )
             .ThrowsExactly<SecurityException>();
 
@@ -322,5 +322,56 @@ public class PathEnvironmentHelperTests
         // Assert
         await Assert.That(result.Status).IsEqualTo(PathRemoveStatus.Error);
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
+    }
+
+    [Test]
+    public async Task EnsureDirectoryIsInPath_When_Path_Is_Not_Rooted_Throws_ArgumentException()
+    {
+        // Arrange
+        var relativePath = "my-tool";
+
+        // Act & Assert
+        var ex = await Assert
+            .That(() => _helper.EnsureDirectoryIsInPath(relativePath))
+            .ThrowsExactly<ArgumentException>();
+
+        await Assert
+            .That(ex!.Message)
+            .StartsWith("The directory path must be a fully rooted, absolute path");
+    }
+
+    [Test]
+    public async Task EnsureApplicationXdgConfigDirectoryIsInPath_When_AppName_Contains_Invalid_Chars_Throws_ArgumentException()
+    {
+        // Arrange
+        // The '<' character is invalid in directory names on Windows.
+        var invalidAppName = "My<App>";
+        _service.GetXdgConfigHome().Returns("/home/user/.config");
+
+        // Act & Assert
+        var ex = await Assert
+            .That(() => _helper.EnsureApplicationXdgConfigDirectoryIsInPath(invalidAppName))
+            .ThrowsExactly<ArgumentException>();
+
+        await Assert
+            .That(ex!.Message)
+            .StartsWith("The application name contains invalid characters.");
+    }
+
+    [Test]
+    public async Task EnsureApplicationXdgConfigDirectoryIsInPath_When_AppName_Contains_Path_Separators_Throws_ArgumentException()
+    {
+        // Arrange
+        var appNameWithPath = $"MyOrg{Path.DirectorySeparatorChar}MyApp";
+        _service.GetXdgConfigHome().Returns("/home/user/.config");
+
+        // Act & Assert
+        var ex = await Assert
+            .That(() => _helper.EnsureApplicationXdgConfigDirectoryIsInPath(appNameWithPath))
+            .ThrowsExactly<ArgumentException>();
+
+        await Assert
+            .That(ex!.Message)
+            .StartsWith("The application name contains invalid characters.");
     }
 }

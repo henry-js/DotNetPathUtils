@@ -67,6 +67,14 @@ public class PathEnvironmentHelper
         if (string.IsNullOrWhiteSpace(directoryPath))
             throw new ArgumentNullException(nameof(directoryPath));
 
+        if (!Path.IsPathRooted(directoryPath))
+        {
+            throw new ArgumentException(
+                "The directory path must be a fully rooted, absolute path to avoid ambiguity.",
+                nameof(directoryPath)
+            );
+        }
+
         try
         {
             _service.CreateDirectory(directoryPath);
@@ -227,6 +235,14 @@ public class PathEnvironmentHelper
         if (options.DirectoryNameCase == DirectoryNameCase.CamelCase)
         {
             name = name.ToCamelCase();
+        }
+        var notAllowedChars = Path.GetInvalidFileNameChars();
+        if (name.IndexOfAny(notAllowedChars) != -1)
+        {
+            throw new ArgumentException(
+                "The application name contains invalid characters.",
+                nameof(appName)
+            );
         }
 
         if (options.PrefixWithPeriod && !name.StartsWith("."))
