@@ -1,4 +1,5 @@
-﻿using System.Security;
+﻿using System.Runtime.InteropServices;
+using System.Security;
 using System.Threading.Tasks;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
@@ -39,7 +40,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAdded);
         _service
             .Received(1)
             .SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
@@ -69,7 +70,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAlreadyExists);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAlreadyExists);
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
     }
 
@@ -90,11 +91,12 @@ public class PathEnvironmentHelperTests
 
         // Act
         var result = _helper.EnsureApplicationXdgConfigDirectoryIsInPath(
+            null,
             EnvironmentVariableTarget.User
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAdded);
 
         _service.Received(1).CreateDirectory(expectedPath);
         _service
@@ -151,7 +153,7 @@ public class PathEnvironmentHelperTests
 
         // Assert
         // The code should correctly identify it as a duplicate and do nothing.
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAlreadyExists);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAlreadyExists);
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
     }
 
@@ -179,7 +181,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAdded);
         _service
             .Received(1)
             .SetEnvironmentVariable("PATH", directoryToAdd, EnvironmentVariableTarget.User);
@@ -210,14 +212,14 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathUpdateResult.PathAdded);
+        await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAdded);
         var expectedNewPath = $"{existingPath}{Path.PathSeparator}{directoryToAdd}";
         _service
             .Received(1)
             .SetEnvironmentVariable("PATH", expectedNewPath, Arg.Any<EnvironmentVariableTarget>());
     }
 
-    [Test]
+    [Test, WindowsOnly]
     public async Task EnsureDirectoryIsInPath_When_Set_Fails_With_SecurityException_Rethrows_With_Custom_Message()
     {
         // Arrange
@@ -238,7 +240,7 @@ public class PathEnvironmentHelperTests
         // Act & Assert
         var ex = await Assert
             .That(() =>
-                _helper.EnsureDirectoryIsInPath("any_path", EnvironmentVariableTarget.Machine)
+                _helper.EnsureDirectoryIsInPath("C:\\anypath", EnvironmentVariableTarget.Machine)
             )
             .ThrowsExactly<SecurityException>();
 
@@ -277,7 +279,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathRemoveResult.PathRemoved);
+        await Assert.That(result.Status).IsEqualTo(PathRemoveStatus.PathRemoved);
         _service
             .Received(1)
             .SetEnvironmentVariable("PATH", expectedNewPath, EnvironmentVariableTarget.User);
@@ -305,7 +307,7 @@ public class PathEnvironmentHelperTests
         );
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathRemoveResult.PathNotFound);
+        await Assert.That(result.Status).IsEqualTo(PathRemoveStatus.PathNotFound);
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
     }
 
@@ -319,7 +321,66 @@ public class PathEnvironmentHelperTests
         var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath();
 
         // Assert
-        await Assert.That(result).IsEqualTo(PathRemoveResult.Error);
+        await Assert.That(result.Status).IsEqualTo(PathRemoveStatus.Error);
         _service.DidNotReceiveWithAnyArgs().SetEnvironmentVariable(default!, default, default);
+    }
+
+    [Test]
+    public async Task EnsureDirectoryIsInPath_When_Path_Is_Not_Rooted_Throws_ArgumentException()
+    {
+        // Arrange
+        var relativePath = "my-tool";
+
+        // Act & Assert
+        var ex = await Assert
+            .That(() => _helper.EnsureDirectoryIsInPath(relativePath))
+            .ThrowsExactly<ArgumentException>();
+
+        await Assert
+            .That(ex!.Message)
+            .StartsWith("The directory path must be a fully rooted, absolute path");
+    }
+
+    [Test, WindowsOnly]
+    public async Task EnsureApplicationXdgConfigDirectoryIsInPath_When_AppName_Contains_Invalid_Chars_Throws_ArgumentException()
+    {
+        // Arrange
+        // The '<' character is invalid in directory names on Windows.
+        var invalidAppName = "My<App>";
+        _service.GetXdgConfigHome().Returns("/home/user/.config");
+
+        // Act & Assert
+        var ex = await Assert
+            .That(() => _helper.EnsureApplicationXdgConfigDirectoryIsInPath(invalidAppName))
+            .ThrowsExactly<ArgumentException>();
+
+        await Assert
+            .That(ex!.Message)
+            .StartsWith("The application name contains invalid characters.");
+    }
+
+    [Test]
+    public async Task EnsureApplicationXdgConfigDirectoryIsInPath_When_AppName_Contains_Path_Separators_Throws_ArgumentException()
+    {
+        // Arrange
+        var appNameWithPath = $"MyOrg{Path.DirectorySeparatorChar}MyApp";
+        _service.GetXdgConfigHome().Returns("/home/user/.config");
+
+        // Act & Assert
+        var ex = await Assert
+            .That(() => _helper.EnsureApplicationXdgConfigDirectoryIsInPath(appNameWithPath))
+            .ThrowsExactly<ArgumentException>();
+
+        await Assert
+            .That(ex!.Message)
+            .StartsWith("The application name contains invalid characters.");
+    }
+}
+
+public class WindowsOnlyAttribute() : SkipAttribute("This test is only supported on Windows")
+{
+    public override Task<bool> ShouldSkip(TestRegisteredContext context)
+    {
+        return Task.FromResult(!RuntimeInformation.IsOSPlatform(OSPlatform.Windows));
     }
 }

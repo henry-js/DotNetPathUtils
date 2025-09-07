@@ -7,13 +7,19 @@ public class PathEnvironmentHelper
 {
     private readonly IEnvironmentService _service;
     private readonly string _pathVariableName;
-    private readonly PathUtilsOptions options;
-    private readonly ILogger<PathEnvironmentHelper>? logger;
+    private readonly PathUtilsOptions _options;
+    private readonly ILogger<PathEnvironmentHelper>? _logger;
+
+    public PathEnvironmentHelper(
+        ILogger<PathEnvironmentHelper>? logger = null,
+        PathUtilsOptions? options = null
+    )
+        : this(new SystemEnvironmentService(), "PATH", options, logger) { }
 
     public PathEnvironmentHelper(
         IEnvironmentService service,
-        ILogger<PathEnvironmentHelper>? logger = null,
-        PathUtilsOptions? options = null
+        PathUtilsOptions? options = null,
+        ILogger<PathEnvironmentHelper>? logger = null
     )
         : this(service, "PATH", options, logger) { }
 
@@ -29,31 +35,31 @@ public class PathEnvironmentHelper
 
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _pathVariableName = pathVariableName;
-        this.options = options ?? PathUtilsOptions.Default;
-        this.logger = logger;
+        _options = options ?? PathUtilsOptions.Default;
+        _logger = logger;
     }
 
-    public PathUpdateResult EnsureApplicationXdgConfigDirectoryIsInPath(
-        EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
+    public PathModificationResult EnsureApplicationXdgConfigDirectoryIsInPath(
         string? appName = null,
+        EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
         PathUtilsOptions? methodOptions = null // Renamed for clarity
     )
     {
-        var effectiveOptions = methodOptions ?? this.options;
+        var effectiveOptions = methodOptions ?? _options;
 
         string formattedName = GetFormattedApplicationName(appName, effectiveOptions);
         if (string.IsNullOrWhiteSpace(formattedName))
-            return PathUpdateResult.Error;
+            return new PathModificationResult(PathUpdateStatus.Error);
 
         string configHome = _service.GetXdgConfigHome();
         if (string.IsNullOrWhiteSpace(configHome))
-            return PathUpdateResult.Error;
+            return new PathModificationResult(PathUpdateStatus.Error);
 
         string appConfigPath = Path.Combine(configHome, formattedName);
         return EnsureDirectoryIsInPath(appConfigPath, target);
     }
 
-    public PathUpdateResult EnsureDirectoryIsInPath(
+    public PathModificationResult EnsureDirectoryIsInPath(
         string directoryPath,
         EnvironmentVariableTarget target = EnvironmentVariableTarget.User
     )
@@ -61,24 +67,34 @@ public class PathEnvironmentHelper
         if (string.IsNullOrWhiteSpace(directoryPath))
             throw new ArgumentNullException(nameof(directoryPath));
 
+        if (!Path.IsPathRooted(directoryPath))
+        {
+            throw new ArgumentException(
+                "The directory path must be a fully rooted, absolute path to avoid ambiguity.",
+                nameof(directoryPath)
+            );
+        }
+
         try
         {
             _service.CreateDirectory(directoryPath);
         }
         catch (Exception ex)
         {
-            logger?.DirectoryCreationFailed(directoryPath, ex.Message);
-            return PathUpdateResult.Error;
+            _logger?.DirectoryCreationFailed(directoryPath, ex.Message);
+            return new PathModificationResult(PathUpdateStatus.Error);
         }
 
         if (
             target == EnvironmentVariableTarget.Process
             && _pathVariableName.Equals("PATH", StringComparison.OrdinalIgnoreCase)
         )
+        {
             throw new ArgumentException(
                 "Process target is not supported for persistent PATH changes. Use User or Machine for persistence.",
                 nameof(target)
             );
+        }
 
         string normalizedDirectoryToAdd = _service
             .GetFullPath(directoryPath)
@@ -113,7 +129,10 @@ public class PathEnvironmentHelper
 
         if (pathExists)
         {
-            return PathUpdateResult.PathAlreadyExists;
+            return new PathModificationResult(
+                PathUpdateStatus.PathAlreadyExists,
+                normalizedDirectoryToAdd
+            );
         }
 
         paths.Add(normalizedDirectoryToAdd);
@@ -126,7 +145,7 @@ public class PathEnvironmentHelper
             {
                 _service.BroadcastEnvironmentChange();
             }
-            return PathUpdateResult.PathAdded;
+            return new PathModificationResult(PathUpdateStatus.PathAdded, normalizedDirectoryToAdd);
         }
         catch (SecurityException ex)
         {
@@ -137,27 +156,27 @@ public class PathEnvironmentHelper
         }
     }
 
-    public PathRemoveResult RemoveApplicationXdgConfigDirectoryFromPath(
+    public PathRemovalResult RemoveApplicationXdgConfigDirectoryFromPath(
         EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
         string? appName = null,
         PathUtilsOptions? methodOptions = null
     )
     {
-        var effectiveOptions = methodOptions ?? this.options;
+        var effectiveOptions = methodOptions ?? _options;
 
         string formattedName = GetFormattedApplicationName(appName, effectiveOptions);
         if (string.IsNullOrWhiteSpace(formattedName))
-            return PathRemoveResult.Error;
+            return new PathRemovalResult(PathRemoveStatus.Error);
 
         string configHome = _service.GetXdgConfigHome();
         if (string.IsNullOrWhiteSpace(configHome))
-            return PathRemoveResult.Error;
+            return new PathRemovalResult(PathRemoveStatus.Error);
 
         string appConfigPath = Path.Combine(configHome, formattedName);
         return RemoveDirectoryFromPath(appConfigPath, target);
     }
 
-    public PathRemoveResult RemoveDirectoryFromPath(
+    public PathRemovalResult RemoveDirectoryFromPath(
         string directoryPath,
         EnvironmentVariableTarget target = EnvironmentVariableTarget.User
     )
@@ -171,7 +190,7 @@ public class PathEnvironmentHelper
 
         string? currentPathVariable = _service.GetEnvironmentVariable(_pathVariableName, target);
         if (string.IsNullOrEmpty(currentPathVariable))
-            return PathRemoveResult.PathNotFound;
+            return new PathRemovalResult(PathRemoveStatus.PathNotFound, normalizedPathToRemove);
 
         List<string> paths =
         [
@@ -196,7 +215,7 @@ public class PathEnvironmentHelper
         });
 
         if (itemsRemoved == 0)
-            return PathRemoveResult.PathNotFound;
+            return new PathRemovalResult(PathRemoveStatus.PathNotFound, normalizedPathToRemove);
 
         string newPathVariable = string.Join(Path.PathSeparator.ToString(), paths);
         _service.SetEnvironmentVariable(_pathVariableName, newPathVariable, target);
@@ -204,7 +223,7 @@ public class PathEnvironmentHelper
         if (_service.IsWindows())
             _service.BroadcastEnvironmentChange();
 
-        return PathRemoveResult.PathRemoved;
+        return new PathRemovalResult(PathRemoveStatus.PathRemoved, normalizedPathToRemove);
     }
 
     private string GetFormattedApplicationName(string? appName, PathUtilsOptions options)
@@ -216,6 +235,14 @@ public class PathEnvironmentHelper
         if (options.DirectoryNameCase == DirectoryNameCase.CamelCase)
         {
             name = name.ToCamelCase();
+        }
+        var notAllowedChars = Path.GetInvalidFileNameChars();
+        if (name.IndexOfAny(notAllowedChars) != -1)
+        {
+            throw new ArgumentException(
+                "The application name contains invalid characters.",
+                nameof(appName)
+            );
         }
 
         if (options.PrefixWithPeriod && !name.StartsWith("."))
