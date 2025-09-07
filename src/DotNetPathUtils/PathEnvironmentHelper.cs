@@ -7,13 +7,19 @@ public class PathEnvironmentHelper
 {
     private readonly IEnvironmentService _service;
     private readonly string _pathVariableName;
-    private readonly PathUtilsOptions options;
-    private readonly ILogger<PathEnvironmentHelper>? logger;
+    private readonly PathUtilsOptions _options;
+    private readonly ILogger<PathEnvironmentHelper>? _logger;
+
+    public PathEnvironmentHelper(
+        ILogger<PathEnvironmentHelper>? logger = null,
+        PathUtilsOptions? options = null
+    )
+        : this(new SystemEnvironmentService(), "PATH", options, logger) { }
 
     public PathEnvironmentHelper(
         IEnvironmentService service,
-        ILogger<PathEnvironmentHelper>? logger = null,
-        PathUtilsOptions? options = null
+        PathUtilsOptions? options = null,
+        ILogger<PathEnvironmentHelper>? logger = null
     )
         : this(service, "PATH", options, logger) { }
 
@@ -29,17 +35,17 @@ public class PathEnvironmentHelper
 
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _pathVariableName = pathVariableName;
-        this.options = options ?? PathUtilsOptions.Default;
-        this.logger = logger;
+        _options = options ?? PathUtilsOptions.Default;
+        _logger = logger;
     }
 
     public PathUpdateResult EnsureApplicationXdgConfigDirectoryIsInPath(
-        EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
         string? appName = null,
+        EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
         PathUtilsOptions? methodOptions = null // Renamed for clarity
     )
     {
-        var effectiveOptions = methodOptions ?? this.options;
+        var effectiveOptions = methodOptions ?? _options;
 
         string formattedName = GetFormattedApplicationName(appName, effectiveOptions);
         if (string.IsNullOrWhiteSpace(formattedName))
@@ -67,7 +73,7 @@ public class PathEnvironmentHelper
         }
         catch (Exception ex)
         {
-            logger?.DirectoryCreationFailed(directoryPath, ex.Message);
+            _logger?.DirectoryCreationFailed(directoryPath, ex.Message);
             return PathUpdateResult.Error;
         }
 
@@ -143,7 +149,7 @@ public class PathEnvironmentHelper
         PathUtilsOptions? methodOptions = null
     )
     {
-        var effectiveOptions = methodOptions ?? this.options;
+        var effectiveOptions = methodOptions ?? _options;
 
         string formattedName = GetFormattedApplicationName(appName, effectiveOptions);
         if (string.IsNullOrWhiteSpace(formattedName))

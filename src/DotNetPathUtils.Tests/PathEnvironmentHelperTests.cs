@@ -90,6 +90,7 @@ public class PathEnvironmentHelperTests
 
         // Act
         var result = _helper.EnsureApplicationXdgConfigDirectoryIsInPath(
+            null,
             EnvironmentVariableTarget.User
         );
 
