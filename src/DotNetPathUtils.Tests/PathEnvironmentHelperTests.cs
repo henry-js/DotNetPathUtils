@@ -90,10 +90,7 @@ public class PathEnvironmentHelperTests
         _service.IsWindows().Returns(false); // Simulate running on Linux
 
         // Act
-        var result = _helper.EnsureApplicationXdgConfigDirectoryIsInPath(
-            null,
-            EnvironmentVariableTarget.User
-        );
+        var result = _helper.EnsureApplicationXdgConfigDirectoryIsInPath();
 
         // Assert
         await Assert.That(result.Status).IsEqualTo(PathUpdateStatus.PathAdded);
@@ -274,9 +271,7 @@ public class PathEnvironmentHelperTests
             .Returns(existingPath);
 
         // Act
-        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath(
-            EnvironmentVariableTarget.User
-        );
+        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath();
 
         // Assert
         await Assert.That(result.Status).IsEqualTo(PathRemoveStatus.PathRemoved);
@@ -302,9 +297,7 @@ public class PathEnvironmentHelperTests
             .Returns(existingPath);
 
         // Act
-        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath(
-            EnvironmentVariableTarget.User
-        );
+        var result = _helper.RemoveApplicationXdgConfigDirectoryFromPath();
 
         // Assert
         await Assert.That(result.Status).IsEqualTo(PathRemoveStatus.PathNotFound);

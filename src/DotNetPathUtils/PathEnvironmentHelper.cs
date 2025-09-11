@@ -11,8 +11,8 @@ public class PathEnvironmentHelper
     private readonly ILogger<PathEnvironmentHelper>? _logger;
 
     public PathEnvironmentHelper(
-        ILogger<PathEnvironmentHelper>? logger = null,
-        PathUtilsOptions? options = null
+        PathUtilsOptions? options = null,
+        ILogger<PathEnvironmentHelper>? logger = null
     )
         : this(new SystemEnvironmentService(), "PATH", options, logger) { }
 
@@ -41,8 +41,8 @@ public class PathEnvironmentHelper
 
     public PathModificationResult EnsureApplicationXdgConfigDirectoryIsInPath(
         string? appName = null,
-        EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
-        PathUtilsOptions? methodOptions = null // Renamed for clarity
+        PathUtilsOptions? methodOptions = null, // Renamed for clarity
+        EnvironmentVariableTarget target = EnvironmentVariableTarget.User
     )
     {
         var effectiveOptions = methodOptions ?? _options;
@@ -157,9 +157,9 @@ public class PathEnvironmentHelper
     }
 
     public PathRemovalResult RemoveApplicationXdgConfigDirectoryFromPath(
-        EnvironmentVariableTarget target = EnvironmentVariableTarget.User,
         string? appName = null,
-        PathUtilsOptions? methodOptions = null
+        PathUtilsOptions? methodOptions = null,
+        EnvironmentVariableTarget target = EnvironmentVariableTarget.User
     )
     {
         var effectiveOptions = methodOptions ?? _options;
